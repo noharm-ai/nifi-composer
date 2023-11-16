@@ -37,4 +37,5 @@ Wait until the containers are ready...
 ```echo "java.arg.8=-Duser.timezone=America/Sao_Paulo" >> conf/bootstrap.conf```
 
 
-### Reference commands for Docker Compose: https://docs.docker.com/engine/reference/commandline/compose_up/
+### Reference commands for Docker Compose: 
+https://docs.docker.com/engine/reference/commandline/compose_up/
