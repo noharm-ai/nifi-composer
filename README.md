@@ -19,12 +19,14 @@ For RPM-based distros:
 
 ## 4. Compose Up
 
-set user and password:
-```docker login ```
+set dockerhub user and password:
 
-```cd nifi-composer ```
-
-```docker compose up -d```
+```
+docker login
+cd nifi-composer
+./update_secrets.sh
+docker compose up -d
+```
 
 Wait until the containers are ready...
 
