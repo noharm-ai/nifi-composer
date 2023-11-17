@@ -83,7 +83,7 @@ services:
         ipv4_address: 172.19.0.5
     volumes:
       - nifi_conf:/opt/nifi/nifi-current/conf
-    entrypoint: ["bash", "-c", "/opt/nifi-toolkit/*/bin/tls-toolkit.sh standalone -n noharm-nifi -f /opt/nifi/nifi-current/conf/nifi.properties -o /opt/nifi/nifi-current/conf/ --isOverwrite -P 4bc73749cca686a5ba87a20400d3e357 -K d4d0df4c643c6ea4ada70451c0c7d950 -S d4d0df4c643c6ea4ada70451c0c7d950 ; chown -R nifi:nifi /opt/nifi/nifi-current/conf/"]
+    #entrypoint: ["bash", "-c", "/opt/nifi-toolkit/*/bin/tls-toolkit.sh standalone -n noharm-nifi -f /opt/nifi/nifi-current/conf/nifi.properties -o /opt/nifi/nifi-current/conf/ --isOverwrite -P 4bc73749cca686a5ba87a20400d3e357 -K d4d0df4c643c6ea4ada70451c0c7d950 -S d4d0df4c643c6ea4ada70451c0c7d950 ; chown -R nifi:nifi /opt/nifi/nifi-current/conf/"]
  restarter:
     image: docker:cli
     restart: unless-stopped
