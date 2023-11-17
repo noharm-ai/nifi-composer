@@ -13,7 +13,7 @@ dot_env_file_path="./noharm.env"
 random_md5_SSTrustS=$(generate_md5)
 random_md5_SSKeyS=$(generate_md5)
 random_md5_SPassS=$(generate_md5)
-random_md5_SPassS=$(echo $random_md5_SPassS | head -c 10)
+random_md5_SPassS=$(echo $random_md5_SPassS | head -c 15)
 
 # Sed command to replace values after -P, -K, and -S
 sed -i "s/\(-P \)[^ ]*/\1$random_md5_SSTrustS/g; s/\(-K \)[^ ]*/\1$random_md5_SSKeyS/g; s/\(-S \)[^ ]*/\1$random_md5_SSKeyS/g" "$docker_compose_file_path"
