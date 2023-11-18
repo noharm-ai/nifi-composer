@@ -19,10 +19,7 @@ For RPM-based distros:
 
 ## 4. Compose Up
 
-set dockerhub user and password:
-
 ```
-docker login
 cd nifi-composer
 ./update_secrets.sh
 docker compose up -d
@@ -30,7 +27,11 @@ docker compose up -d
 
 Wait until the containers are ready...
 
-```docker logout```
+```
+docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
+docker exec --user="root" -t noharm-nifi apt update
+docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
+```
 
 ## 5. Getname - Simple Test
 
