@@ -31,6 +31,7 @@ Wait until the containers are ready...
 docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
 docker exec --user="root" -t noharm-nifi apt update
 docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
+docker restart noharm-nifi
 ```
 
 ## 5. Getname - Simple Test
