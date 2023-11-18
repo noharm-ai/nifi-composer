@@ -12,9 +12,8 @@ services:
  nifi:
     container_name: "noharm-nifi"
     hostname: "noharm-nifi"
-    image: "noharm/nifi:latest"
-    entrypoint:
-      - "../scripts/start.sh"
+    image: "apache/nifi:latest"
+    entrypoint: ["bash", "-c", "/opt/nifi/scripts/ext/update_nifi.sh; /opt/nifi/scripts/start.sh"]
     env_file:
       - ./noharm.env
     ipc: "private"
@@ -34,6 +33,7 @@ services:
     working_dir: "/opt/nifi/nifi-current"
     volumes:
       - nifi_conf:/opt/nifi/nifi-current/conf
+      - ./:/opt/nifi/scripts/ext/
  myanony:
     container_name: "noharm-anony"
     hostname: "noharm-anony"
@@ -84,16 +84,3 @@ services:
     volumes:
       - nifi_conf:/opt/nifi/nifi-current/conf
     #entrypoint: ["bash", "-c", "/opt/nifi-toolkit/*/bin/tls-toolkit.sh standalone -n noharm-nifi -f /opt/nifi/nifi-current/conf/nifi.properties -o /opt/nifi/nifi-current/conf/ --isOverwrite -P 4bc73749cca686a5ba87a20400d3e357 -K d4d0df4c643c6ea4ada70451c0c7d950 -S d4d0df4c643c6ea4ada70451c0c7d950 ; chown -R nifi:nifi /opt/nifi/nifi-current/conf/"]
- restarter:
-    image: docker:cli
-    restart: unless-stopped
-    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
-    entrypoint: ["/bin/sh","-c"]
-    command:
-      - |
-        while true; do
-          if [ "$$(date +'%H:%M')" = '02:00' ]; then
-            docker restart nifi-toolkit
-          fi
-          sleep 60
-        done
