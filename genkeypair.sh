@@ -9,20 +9,28 @@ get_property_value() {
   echo "$prop_value"
 }
 
+# Function to replce property value from nifi.properties
+prop_replace () {
+  target_file=${3:-${nifi_props_file}}
+  echo "File [${target_file}] replacing [${1}]"
+  sed -i -e "s|^$1=.*$|$1=$2|"  ${target_file}
+}
+
 # Paths to NiFi properties file
-nifi_properties_file=${NIFI_HOME}/conf/nifi.properties
+nifi_props_file=${NIFI_HOME}/conf/nifi.properties
 
 # Extract relevant values from nifi.properties
-KEYSTORE_PASSWORD=$(get_property_value "nifi.security.keystorePasswd" "$nifi_properties_file")
-TRUSTSTORE_PASSWORD=$(get_property_value "nifi.security.truststorePasswd" "$nifi_properties_file")
+KEYSTORE_PASSWORD=$(get_property_value "nifi.security.keystorePasswd" "$nifi_props_file")
+TRUSTSTORE_PASSWORD=$(get_property_value "nifi.security.truststorePasswd" "$nifi_props_file")
 
 echo KEYSTORE_PASSWORD = ${KEYSTORE_PASSWORD}
 echo TRUSTSTORE_PASSWORD = ${TRUSTSTORE_PASSWORD}
+echo NIFI_HOME = ${NIFI_HOME}
 
 echo Generating KeyStore...
-rm ${NIFI_HOME}/conf/new_keystore.p12
-rm ${NIFI_HOME}/conf/key.pem
-rm ${NIFI_HOME}/conf/cert.pem
+[ -f "${NIFI_HOME}/conf/new_keystore.p12" ] && rm ${NIFI_HOME}/conf/new_keystore.p12
+[ -f "${NIFI_HOME}/conf/key.pem" ] && rm ${NIFI_HOME}/conf/key.pem
+[ -f "${NIFI_HOME}/conf/cert.pem" ] && rm ${NIFI_HOME}/conf/cert.pem
 
 #openssl req -x509 -newkey rsa:2048 -keyout ${NIFI_HOME}/conf/key.pem -out ${NIFI_HOME}/conf/cert.pem -days 60 -subj "/CN=localhost" -addext "subjectAltName = DNS:localhost, DNS:noharm-nifi" -addext "basicConstraints = CA:TRUE" -addext "extendedKeyUsage = serverAuth,clientAuth" -addext "keyUsage = digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign" -passout pass:${KEYSTORE_PASSWORD}
 
@@ -33,6 +41,7 @@ rm ${NIFI_HOME}/conf/cert.pem
 /opt/java/openjdk/bin/keytool -v -list -keystore ${NIFI_HOME}/conf/new_keystore.p12 -storepass ${KEYSTORE_PASSWORD}
 
 echo Extracting Certificate...
+[ -f "${NIFI_HOME}/conf/cert.crt" ] && rm ${NIFI_HOME}/conf/cert.crt
 /opt/java/openjdk/bin/keytool -exportcert -keystore ${NIFI_HOME}/conf/keystore.p12 -storepass ${KEYSTORE_PASSWORD} -alias nifi-key -rfc -file ${NIFI_HOME}/conf/cert.crt
 
 /opt/java/openjdk/bin/keytool -printcert -v -file ${NIFI_HOME}/conf/cert.crt
@@ -42,7 +51,10 @@ echo Extracting Certificate...
 /opt/java/openjdk/bin/keytool -v -list -keystore ${NIFI_HOME}/conf/new_keystore.p12 -storepass ${KEYSTORE_PASSWORD}
 
 echo Generating TrustKeyStore...
-rm ${NIFI_HOME}/conf/new_truststore.p12
+[ -f "${NIFI_HOME}/conf/new_truststore.p12" ] && rm ${NIFI_HOME}/conf/new_truststore.p12
 /opt/java/openjdk/bin/keytool -import -file ${NIFI_HOME}/conf/cert.crt -alias nifi-cert -keystore ${NIFI_HOME}/conf/new_truststore.p12 -storetype PKCS12 -keypass ${TRUSTSTORE_PASSWORD} -storepass ${TRUSTSTORE_PASSWORD} -noprompt
 
 /opt/java/openjdk/bin/keytool -v -list -keystore ${NIFI_HOME}/conf/new_truststore.p12 -storepass ${TRUSTSTORE_PASSWORD}
+
+prop_replace 'nifi.security.keystore' "${NIFI_HOME}/conf/new_keystore.p12"
+prop_replace 'nifi.security.truststore' "${NIFI_HOME}/conf/new_truststore.p12"
