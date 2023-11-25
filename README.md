@@ -29,6 +29,7 @@ Docker Install Ubuntu
 ```
 cd nifi-composer
 ./update_secrets.sh
+sudo chown $USER /var/run/docker.sock
 docker compose up -d
 ```
 
