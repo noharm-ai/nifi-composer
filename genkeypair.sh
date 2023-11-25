@@ -26,10 +26,12 @@ nifi_props_file=${NIFI_HOME}/conf/nifi.properties
 # Extract relevant values from nifi.properties
 KEYSTORE_PASSWORD=$(get_property_value "nifi.security.keystorePasswd" "$nifi_props_file")
 TRUSTSTORE_PASSWORD=$(get_property_value "nifi.security.truststorePasswd" "$nifi_props_file")
+HOSTNAME=$(get_property_value "nifi.remote.input.host" "$nifi_props_file")
 
 echo KEYSTORE_PASSWORD = ${KEYSTORE_PASSWORD}
 echo TRUSTSTORE_PASSWORD = ${TRUSTSTORE_PASSWORD}
 echo NIFI_HOME = ${NIFI_HOME}
+echo HOSTNAME = ${HOSTNAME}
 
 echo Removing Old Files...
 [ -f "${NIFI_HOME}/conf/new_keystore.p12" ] && rm ${NIFI_HOME}/conf/new_keystore.p12
@@ -39,7 +41,7 @@ echo Removing Old Files...
 [ -f "${NIFI_HOME}/conf/cert.crt" ] && rm ${NIFI_HOME}/conf/cert.crt
 
 echo Generating New Certificate...
-openssl req -x509 -newkey rsa:2048 -keyout ${NIFI_HOME}/conf/key.pem -out ${NIFI_HOME}/conf/cert.pem -days 99999 -subj "/CN=localhost" -addext "subjectAltName = DNS:localhost, DNS:noharm-nifi" -addext "basicConstraints = CA:TRUE" -addext "extendedKeyUsage = serverAuth,clientAuth" -addext "keyUsage = digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign" -passout pass:${KEYSTORE_PASSWORD}
+openssl req -x509 -newkey rsa:2048 -keyout ${NIFI_HOME}/conf/key.pem -out ${NIFI_HOME}/conf/cert.pem -days 99999 -subj "/CN=localhost" -addext "subjectAltName = DNS:localhost, DNS:${HOSTNAME}" -addext "basicConstraints = CA:TRUE" -addext "extendedKeyUsage = serverAuth,clientAuth" -addext "keyUsage = digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign" -passout pass:${KEYSTORE_PASSWORD}
 
 echo Generating KeyStore...
 openssl pkcs12 -export -out ${NIFI_HOME}/conf/new_keystore.p12 -inkey ${NIFI_HOME}/conf/key.pem -in ${NIFI_HOME}/conf/cert.pem -name nifi-key -passin pass:${KEYSTORE_PASSWORD} -passout pass:${KEYSTORE_PASSWORD}
