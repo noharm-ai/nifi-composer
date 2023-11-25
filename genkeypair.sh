@@ -58,8 +58,6 @@ ${KEYTOOL_HOME} -import -file ${NIFI_HOME}/conf/cert.crt -alias nifi-cert -keyst
 
 ${KEYTOOL_HOME} -v -list -keystore ${NIFI_HOME}/conf/new_truststore.p12 -storepass ${TRUSTSTORE_PASSWORD}
 
-[ -f "${NIFI_HOME}/conf/new_keystore.p12" ] && 
-
 # Check if Works
 if [ ! -f "${NIFI_HOME}/conf/new_keystore.p12" ]  || [ ! -f "${NIFI_HOME}/conf/new_truststore.p12" ]; then
     echo "Something got wrong"
