@@ -27,6 +27,7 @@ Docker Install Ubuntu
 ## 4. Compose Up
 
 ```
+docker login
 cd nifi-composer
 ./update_secrets.sh
 sudo chown $USER /var/run/docker.sock
@@ -40,6 +41,7 @@ docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.
 docker exec --user="root" -t noharm-nifi apt update
 docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
 docker restart noharm-nifi
+docker logout
 ```
 
 ## 5. Getname - Simple Test
