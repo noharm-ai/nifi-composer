@@ -1,4 +1,4 @@
-# nifi-composer - working for Nifi and Anony
+# nifi-composer - NoHarm Package
 Build NoHarm Integration
 
 ## 1. Install Docker compose 
