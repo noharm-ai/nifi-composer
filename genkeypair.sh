@@ -36,15 +36,10 @@ echo HOSTNAME = ${HOSTNAME}
 echo Removing Old Files...
 [ -f "${NIFI_HOME}/conf/new_keystore.p12" ] && rm ${NIFI_HOME}/conf/new_keystore.p12
 [ -f "${NIFI_HOME}/conf/new_truststore.p12" ] && rm ${NIFI_HOME}/conf/new_truststore.p12
-[ -f "${NIFI_HOME}/conf/key.pem" ] && rm ${NIFI_HOME}/conf/key.pem
-[ -f "${NIFI_HOME}/conf/cert.pem" ] && rm ${NIFI_HOME}/conf/cert.pem
 [ -f "${NIFI_HOME}/conf/cert.crt" ] && rm ${NIFI_HOME}/conf/cert.crt
 
-echo Generating New Certificate...
-openssl req -x509 -newkey rsa:2048 -keyout ${NIFI_HOME}/conf/key.pem -out ${NIFI_HOME}/conf/cert.pem -days 99999 -subj "/CN=localhost" -addext "subjectAltName = DNS:localhost, DNS:${HOSTNAME}" -addext "basicConstraints = CA:TRUE" -addext "extendedKeyUsage = serverAuth,clientAuth" -addext "keyUsage = digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign" -passout pass:${KEYSTORE_PASSWORD}
-
 echo Generating KeyStore...
-openssl pkcs12 -export -out ${NIFI_HOME}/conf/new_keystore.p12 -inkey ${NIFI_HOME}/conf/key.pem -in ${NIFI_HOME}/conf/cert.pem -name nifi-key -passin pass:${KEYSTORE_PASSWORD} -passout pass:${KEYSTORE_PASSWORD}
+${KEYTOOL_HOME} -genkeypair -keystore ${NIFI_HOME}/conf/new_keystore.p12 -storetype PKCS12 -storepass ${KEYSTORE_PASSWORD} -alias nifi-key -keyalg RSA -keysize 2048 -validity 99999 -dname "CN=localhost" -ext san=dns:localhost,dns:${HOSTNAME} -ext bc=ca:true -ext eku=serverAuth,clientAuth -ext ku=digitalSignature,nonRepudiation,keyEncipherment,dataEncipherment,keyAgreement,keyCertSign,cRLSign
 
 ${KEYTOOL_HOME} -v -list -keystore ${NIFI_HOME}/conf/new_keystore.p12 -storepass ${KEYSTORE_PASSWORD}
 
