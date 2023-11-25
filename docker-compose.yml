@@ -55,6 +55,7 @@ services:
     container_name: "noharm-getname"
     hostname: "noharm-getname"
     image: "noharm/getname:latest"
+    entrypoint: ["bash", "-c", "/app/scripts/renew_cert.sh; /start.sh"]
     env_file:
       - ./noharm.env    
     ipc: "private"
@@ -71,3 +72,5 @@ services:
       - "443:443/tcp"
     restart: "always"
     working_dir: "/app"
+    volumes:
+      - ./:/app/scripts/
