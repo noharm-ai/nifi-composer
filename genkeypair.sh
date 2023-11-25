@@ -61,3 +61,8 @@ chown nifi:nifi ${NIFI_HOME}/conf/new_truststore.p12
 
 prop_replace 'nifi.security.keystore' "${NIFI_HOME}/conf/new_keystore.p12"
 prop_replace 'nifi.security.truststore' "${NIFI_HOME}/conf/new_truststore.p12"
+
+## HOW TO UNDONE IT
+## docker cp nifi.properties noharm-nifi:/opt/nifi/nifi-current/conf/nifi.properties
+## redo old p12 path
+## docker cp noharm-nifi:/opt/nifi/nifi-current/conf/nifi.properties nifi.properties
