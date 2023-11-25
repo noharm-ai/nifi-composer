@@ -25,12 +25,10 @@ cd nifi-composer
 docker compose up -d
 ```
 
-Wait until the containers are ready...
+Wait until the containers/nifi web are ready...
 
 ```
 docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
-docker exec --user="root" -t noharm-nifi apt update
-docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
 docker restart noharm-nifi
 ```
 
