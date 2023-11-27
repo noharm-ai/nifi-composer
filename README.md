@@ -36,6 +36,10 @@ docker compose up -d
 Wait until the containers/nifi web are ready...
 
 ```
+docker logs noharm-nifi --tail 500 | grep "JettyServer NiFi has started"
+```
+
+```
 docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
 docker exec --user="root" -t noharm-nifi apt update
 docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
