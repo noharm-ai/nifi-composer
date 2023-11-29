@@ -20,6 +20,13 @@ prop_replace () {
 KEYTOOL_HOME=$(readlink -f $(which keytool))
 echo KEYTOOL_HOME=${KEYTOOL_HOME}
 
+[ -z "${KEYTOOL_HOME}" ] && [ -f "/opt/java/openjdk/bin/keytool" ] && KEYTOOL_HOME="/opt/java/openjdk/bin/keytool"
+
+if [ -z "${KEYTOOL_HOME}" ]; then
+  echo "Can find Keytool!"
+  exit 1
+fi
+
 # Paths to NiFi properties file
 nifi_props_file=${NIFI_HOME}/conf/nifi.properties
 
