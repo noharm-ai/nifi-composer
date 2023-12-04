@@ -45,8 +45,20 @@ docker exec --user="root" -t noharm-nifi apt update
 docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
 docker restart noharm-nifi
 ```
+### 4.1 Validation
+
+ - Check if the certificate is valid for 200 years (in the browser)
+ - Check if aws is working ```docker exec --user="nifi" -t noharm-nifi aws s3 ls```
 
 ## 5. Getname - Simple Test
+
+Check if service is working:
+
+```
+curl https://nomedocliente.getname.noharm.ai
+```
+
+Check if database connection is working:
 
 ```
 curl https://nomedocliente.getname.noharm.ai/patient-name/12345
