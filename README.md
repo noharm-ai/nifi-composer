@@ -47,7 +47,8 @@ docker restart noharm-nifi
 ```
 ### 4.1 Validation
 
- - Check if the certificate is valid for 200 years (in the browser)
+ - Check if the certificate is valid for 200 years (in the browser):
+    - At Google Chrome menu: More tools - Developer tools - select the "Security" tab - View certificate
  - Check if aws is working ```docker exec --user="nifi" -t noharm-nifi aws s3 ls```
 
 ## 5. Getname - Simple Test
