@@ -79,5 +79,11 @@ curl -X PUT -H 'Accept: application/json' -H 'Content-Type: application/json' ht
 
 [(https://github.com/noharm-ai/noharm-anony)](https://github.com/noharm-ai/noharm-anony)
 
+## 7. How to rebuild a single container
+
+```
+docker stop <servicename>
+docker compose up -d --build <servicename>
+```
 ### Reference commands for Docker Compose: 
 https://docs.docker.com/engine/reference/commandline/compose_up/
