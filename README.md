@@ -83,6 +83,7 @@ curl -X PUT -H 'Accept: application/json' -H 'Content-Type: application/json' ht
 
 ```
 docker stop <servicename>
+docker rm <servicename>
 docker compose up -d --build <servicename>
 ```
 ### Reference commands for Docker Compose: 
