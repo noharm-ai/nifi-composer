@@ -7,8 +7,6 @@ wget -c https://repo1.maven.org/maven2/com/microsoft/sqlserver/mssql-jdbc/12.6.2
 wget -c https://jdbc.postgresql.org/download/postgresql-42.6.0.jar -P ${NIFI_HOME}/lib
 wget -c https://repo1.maven.org/maven2/org/apache/nifi/nifi-kite-nar/1.15.3/nifi-kite-nar-1.15.3.nar -P ${NIFI_HOME}/lib
 echo "java.arg.8=-Duser.timezone=America/Sao_Paulo" >> ${NIFI_HOME}/conf/bootstrap.conf
-sed -i 's/^java.arg.2=.*/java.arg.2=-Xms1024m/' ${NIFI_HOME}/conf/bootstrap.conf
-sed -i 's/^java.arg.3=.*/java.arg.3=-Xms1024m/' ${NIFI_HOME}/conf/bootstrap.conf
 sed -i 's/^nifi.provenance.repository.max.storage.time=.*/nifi.provenance.repository.max.storage.time=3 days/' ${NIFI_HOME}/conf/nifi.properties
 sed -i 's/^nifi.provenance.repository.max.storage.size=.*/nifi.provenance.repository.max.storage.size=1 GB/' ${NIFI_HOME}/conf/nifi.properties
 sed -i 's/^nifi.content.repository.archive.max.retention.period=.*/nifi.content.repository.archive.max.retention.period=1 days/' ${NIFI_HOME}/conf/nifi.properties
