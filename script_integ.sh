@@ -26,7 +26,7 @@ validate_requirements() {
     echo "Validando requisitos de sistema..."
     
     DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
-    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')  # Captura a memória disponível em MB
+    MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $7}')  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
     echo "Espaço em disco disponível: ${DISK_SPACE}GB"
