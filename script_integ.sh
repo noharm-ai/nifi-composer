@@ -141,9 +141,21 @@ install_containers() {
     docker restart noharm-nifi
 }
 
+test_services() {
+    echo "Verificando se o AWS CLI está funcionando dentro do container..."
+    docker exec --user="root" -it noharm-nifi /bin/bash -c "aws s3 ls && exit"
+
+    echo "Verificando se o serviço está funcionando para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID..."
+    curl "https://$CLIENT_NAME.getname.noharm.ai/patient-name/$PATIENT_ID"
+
+    echo "Executando teste simples no serviço Anony..."
+    curl -X PUT -H 'Accept: application/json' -H 'Content-Type: application/json' \
+        http://localhost/clean -d '{"TEXT" : "FISIOTERAPIA TRAUMATO - MANHÃ Henrique Dias, 38 anos. Exercícios metabólicos de extremidades inferiores. Realizo mobilização patelar e leve mobilização de flexão de joelho conforme liberado pelo Dr Marcelo Arocha. Oriento cuidados e posicionamentos."}'
+}
+
 main() {
-    if [ "$#" -ne 11 ]; then
-        echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY>"
+    if [ "$#" -ne 13 ]; then
+        echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
         exit 1
     fi
 
@@ -158,6 +170,8 @@ main() {
     DB_PASS=$9
     DB_QUERY=${10}
     DB_MULTI_QUERY=${11}
+    CLIENT_NAME=${12}
+    PATIENT_ID=${13}
 
     validate_requirements
 
@@ -173,6 +187,7 @@ main() {
     configure_docker_non_root
     test_docker
     install_containers
+    test_services
 
     echo "Script executado com sucesso!"
 }
