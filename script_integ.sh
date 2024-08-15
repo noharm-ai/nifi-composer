@@ -46,14 +46,18 @@ get_memory_available() {
         return
     fi
 
-    # Se todas as tentativas falharem, retorna uma mensagem de erro
-    echo "Erro ao capturar a memória disponível" >&2
-    exit 1
+    # Se todas as tentativas falharem, retorna "N/A" e segue com a execução
+    echo "N/A"
 }
 
 validate_requirements() {
     echo "Validando requisitos de sistema..."
-    
+
+    # Exibe os valores gerais de espaço em disco e memória
+    df -h
+    df -h /var/lib/docker || echo "Docker não está instalado, pulando /var/lib/docker."
+    free -m
+
     DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
     MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
@@ -67,9 +71,11 @@ validate_requirements() {
         exit 1
     fi
 
-    if [[ "$MEM_AVAILABLE" -lt 4096 ]]; then
+    if [[ "$MEM_AVAILABLE" != "N/A" && "$MEM_AVAILABLE" -lt 4096 ]]; then
         echo "Memória insuficiente. Necessário pelo menos 4GB."
         exit 1
+    elif [[ "$MEM_AVAILABLE" == "N/A" ]]; then
+        echo "Memória disponível não pôde ser determinada, mas continuando..."
     fi
 
     if [[ "$VCPUS" -lt 4 ]]; then
