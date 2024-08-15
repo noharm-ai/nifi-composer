@@ -22,11 +22,40 @@ rollback() {
     echo "Reversão concluída."
 }
 
+get_memory_available() {
+    # Tenta capturar a memória disponível usando diferentes abordagens
+
+    # Primeira tentativa: usando o campo 'available' (sistemas modernos)
+    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')
+    if [[ -n "$MEM_AVAILABLE" ]]; then
+        echo "$MEM_AVAILABLE"
+        return
+    fi
+
+    # Segunda tentativa: somando memória livre + buffers/cache (sistemas mais antigos)
+    MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $4+$6}')
+    if [[ -n "$MEM_AVAILABLE" ]]; then
+        echo "$MEM_AVAILABLE"
+        return
+    fi
+
+    # Terceira tentativa: usando o campo 'free' diretamente (pode não ser preciso, mas uma estimativa)
+    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $4}')
+    if [[ -n "$MEM_AVAILABLE" ]]; then
+        echo "$MEM_AVAILABLE"
+        return
+    fi
+
+    # Se todas as tentativas falharem, retorna uma mensagem de erro
+    echo "Erro ao capturar a memória disponível" >&2
+    exit 1
+}
+
 validate_requirements() {
     echo "Validando requisitos de sistema..."
     
     DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
-    MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $7}')  # Captura a memória disponível em MB
+    MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
     echo "Espaço em disco disponível: ${DISK_SPACE}GB"
