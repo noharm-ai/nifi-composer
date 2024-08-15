@@ -68,15 +68,13 @@ validate_requirements() {
 
     DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}' | tr -d 'G')  # Captura o espaço total em GB
     DISK_AVAILABLE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
-    MEM_TOTAL=$(free -m | awk '/^Mem.:/{print $2}')  # Captura a memória total em MB
-    MEM_TOTAL2=$(free -m | awk '/Mem.:/{print $2}')  # Captura a memória total em MB
+    MEM_TOTAL=$(free -m | awk '/^Mem:/{print $2}')  # Captura a memória total em MB
     MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
     echo "Espaço total em disco: ${DISK_TOTAL}GB"
     echo "Espaço disponível em disco: ${DISK_AVAILABLE}GB"
     echo "Memória total: ${MEM_TOTAL}MB"
-    echo "Memória total 2: ${MEM_TOTAL2}MB"
     echo "Memória disponível: ${MEM_AVAILABLE}MB"
     echo "vCPUs disponíveis: ${VCPUS}"
 
@@ -90,16 +88,9 @@ validate_requirements() {
         exit 1
     fi
 
-    if [[ "$MEM_TOTAL" -lt 4096 ]]; then
-        echo "Memória total insuficiente. Necessário pelo menos 4GB."
+    if [[ "$MEM_TOTAL" -lt 3500 ]]; then
+        echo "Memória total insuficiente. Necessário pelo menos 3.5GB."
         exit 1
-    fi
-
-    if [[ "$MEM_AVAILABLE" != "N/A" && "$MEM_AVAILABLE" -lt 3072 ]]; then
-        echo "Memória disponível insuficiente. Necessário pelo menos 3GB."
-        exit 1
-    elif [[ "$MEM_AVAILABLE" == "N/A" ]]; then
-        echo "Memória disponível não pôde ser determinada, mas continuando..."
     fi
 
     if [[ "$VCPUS" -lt 4 ]]; then
