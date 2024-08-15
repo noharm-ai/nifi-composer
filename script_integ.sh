@@ -24,7 +24,7 @@ rollback() {
 
 validate_requirements() {
     echo "Validando requisitos de sistema..."
-    DISK_SPACE=$(df -h / | grep -Eo '[0-9]+%' | head -n1)
+    DISK_SPACE=$(df -h / | grep -Eo '[0-9]+%' | head -n1 | tr -d '%')
     MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')
     VCPUS=$(nproc)
 
