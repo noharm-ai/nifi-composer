@@ -29,6 +29,16 @@ update_env_file() {
     echo "Arquivo noharm.env atualizado com sucesso."
 }
 
+generate_password() {
+    echo "Gerando senha para o usuário nifi_noharm..."
+    cd nifi-composer/
+
+    # Executa o script para gerar e substituir a senha
+    ./update_secrets.sh
+
+    echo "Senha gerada e aplicada no arquivo noharm.env."
+}
+
 install_containers() {
     echo "Instalando containers com Docker Compose..."
     git clone https://github.com/noharm-ai/nifi-composer/
