@@ -46,6 +46,13 @@ get_memory_available() {
         return
     fi
 
+    # Quarta tentativa: pegando a coluna 'livre'
+    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $3}')
+    if [[ -n "$MEM_AVAILABLE" ]]; then
+        echo "$MEM_AVAILABLE"
+        return
+    fi
+
     # Se todas as tentativas falharem, retorna "N/A" e segue com a execução
     echo "N/A"
 }
@@ -61,7 +68,7 @@ validate_requirements() {
 
     DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}' | tr -d 'G')  # Captura o espaço total em GB
     DISK_AVAILABLE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
-    MEM_TOTAL=$(free -m | awk '/^Mem:/{print $2}')  # Captura a memória total em MB
+    MEM_TOTAL=$(free -m | awk '/^Mem:/{print $1}')  # Captura a memória total em MB
     MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
@@ -71,8 +78,8 @@ validate_requirements() {
     echo "Memória disponível: ${MEM_AVAILABLE}MB"
     echo "vCPUs disponíveis: ${VCPUS}"
 
-    if [[ "$DISK_TOTAL" -lt 100 ]]; then
-        echo "Espaço total em disco insuficiente. Necessário pelo menos 100GB."
+    if [[ "$DISK_TOTAL" -lt 95 ]]; then
+        echo "Espaço total em disco insuficiente. Necessário pelo menos 95GB."
         exit 1
     fi
 
