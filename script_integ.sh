@@ -135,9 +135,17 @@ install_docker_rpm_based() {
 
 configure_docker_non_root() {
     echo "Configurando Docker para ser executado como usuário não-root..."
+    
+    # Mudança de proprietário do socket do Docker
     sudo chown $USER /var/run/docker.sock
-    sudo groupadd docker || true
+
+    # Tenta adicionar o grupo "docker", mas ignora o erro se o grupo já existir
+    sudo groupadd docker 2>/dev/null || echo "Grupo 'docker' já existe, continuando..."
+    
+    # Adiciona o usuário atual ao grupo "docker"
     sudo usermod -aG docker $USER
+    
+    # Aplica as mudanças de grupo no shell atual
     newgrp docker
 }
 
