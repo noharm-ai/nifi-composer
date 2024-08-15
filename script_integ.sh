@@ -68,7 +68,7 @@ validate_requirements() {
 
     DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}' | tr -d 'G')  # Captura o espaço total em GB
     DISK_AVAILABLE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
-    MEM_TOTAL=$(free -m | awk '/^Mem:/{print $1}')  # Captura a memória total em MB
+    MEM_TOTAL=$(free -m | awk '/^Mem.:/{print $1}')  # Captura a memória total em MB
     MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
