@@ -51,6 +51,7 @@ get_memory_available() {
 }
 
 validate_requirements() {
+    echo "Data Atual: $(date)"
     echo "Validando requisitos de sistema..."
 
     # Exibe os valores gerais de espaço em disco e memória
@@ -58,21 +59,35 @@ validate_requirements() {
     df -h /var/lib/docker || echo "Docker não está instalado, pulando /var/lib/docker."
     free -m
 
-    DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
+    DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}' | tr -d 'G')  # Captura o espaço total em GB
+    DISK_AVAILABLE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
+    MEM_TOTAL=$(free -m | awk '/^Mem:/{print $2}')  # Captura a memória total em MB
     MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
-    echo "Espaço em disco disponível: ${DISK_SPACE}GB"
+    echo "Espaço total em disco: ${DISK_TOTAL}GB"
+    echo "Espaço disponível em disco: ${DISK_AVAILABLE}GB"
+    echo "Memória total: ${MEM_TOTAL}MB"
     echo "Memória disponível: ${MEM_AVAILABLE}MB"
     echo "vCPUs disponíveis: ${VCPUS}"
 
-    if [[ "$DISK_SPACE" -lt 100 ]]; then
-        echo "Espaço em disco insuficiente. Necessário pelo menos 100GB."
+    if [[ "$DISK_TOTAL" -lt 100 ]]; then
+        echo "Espaço total em disco. Necessário pelo menos 100GB."
         exit 1
     fi
 
-    if [[ "$MEM_AVAILABLE" != "N/A" && "$MEM_AVAILABLE" -lt 4096 ]]; then
-        echo "Memória insuficiente. Necessário pelo menos 4GB."
+    if [[ "$DISK_AVAILABLE" -lt 75 ]]; then
+        echo "Espaço disponível em disco insuficiente. Necessário pelo menos 75GB."
+        exit 1
+    fi
+
+    if [[ "$MEM_TOTAL" -lt 4096 ]]; then
+        echo "Memória total. Necessário pelo menos 4GB."
+        exit 1
+    fi
+
+    if [[ "$MEM_AVAILABLE" != "N/A" && "$MEM_AVAILABLE" -lt 3072 ]]; then
+        echo "Memória disponível insuficiente. Necessário pelo menos 3GB."
         exit 1
     elif [[ "$MEM_AVAILABLE" == "N/A" ]]; then
         echo "Memória disponível não pôde ser determinada, mas continuando..."
@@ -194,7 +209,7 @@ test_services() {
 }
 
 main() {
-    if [ "$#" -ne 13 ]; then
+    if [ "$#" -ne 13 ]; então
         echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
         exit 1
     fi
@@ -215,9 +230,9 @@ main() {
 
     validate_requirements
 
-    if [[ -f /etc/debian_version ]]; then
+    if [[ -f /etc/debian_version ]]; então
         install_docker_ubuntu_debian
-    elif [[ -f /etc/redhat-release ]]; then
+    elif [[ -f /etc/redhat-release ]]; então
         install_docker_rpm_based
     else
         echo "Distribuição Linux não suportada."
