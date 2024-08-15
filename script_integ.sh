@@ -24,26 +24,31 @@ rollback() {
 
 validate_requirements() {
     echo "Validando requisitos de sistema..."
-    DISK_SPACE=$(df -h / | grep -Eo '[0-9]+%' | head -n1 | tr -d '%')
-    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')
-    VCPUS=$(nproc)
+    
+    DISK_SPACE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
+    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')  # Captura a memória disponível em MB
+    VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
+
+    echo "Espaço em disco disponível: ${DISK_SPACE}GB"
+    echo "Memória disponível: ${MEM_AVAILABLE}MB"
+    echo "vCPUs disponíveis: ${VCPUS}"
 
     if [[ "$DISK_SPACE" -lt 100 ]]; then
-        echo "Espaço em disco insuficiente. Necessário 100GB."
+        echo "Espaço em disco insuficiente. Necessário pelo menos 100GB."
         exit 1
     fi
 
     if [[ "$MEM_AVAILABLE" -lt 4096 ]]; then
-        echo "Memória insuficiente. Necessário 4GB."
+        echo "Memória insuficiente. Necessário pelo menos 4GB."
         exit 1
     fi
 
     if [[ "$VCPUS" -lt 4 ]]; then
-        echo "vCPUs insuficientes. Necessário 4 vCPUs."
+        echo "vCPUs insuficientes. Necessário pelo menos 4 vCPUs."
         exit 1
     fi
 
-    echo "Requisitos de sistema validados."
+    echo "Requisitos de sistema validados com sucesso."
 }
 
 install_docker_ubuntu_debian() {
