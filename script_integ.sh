@@ -19,8 +19,6 @@ rollback() {
         sudo yum remove -y nano
     fi
 
-    rm -f noharm.env  # Remove o arquivo de ambiente se criado
-
     echo "Reversão concluída."
 }
 
@@ -100,19 +98,19 @@ test_docker() {
 
 update_env_file() {
     echo "Atualizando variáveis de ambiente no arquivo noharm.env..."
-    cat <<EOF > noharm.env
-AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-GETNAME_SSL_URL=$GETNAME_SSL_URL
-DB_TYPE=$DB_TYPE
-DB_HOST=$DB_HOST
-DB_DATABASE=$DB_DATABASE
-DB_PORT=$DB_PORT
-DB_USER=$DB_USER
-DB_PASS=$DB_PASS
-DB_QUERY=$DB_QUERY
-DB_MULTI_QUERY=$DB_MULTI_QUERY
-EOF
+
+    # Atualiza somente as variáveis passadas como argumento
+    [ -n "$AWS_ACCESS_KEY_ID" ] && sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" noharm.env
+    [ -n "$AWS_SECRET_ACCESS_KEY" ] && sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" noharm.env
+    [ -n "$GETNAME_SSL_URL" ] && sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" noharm.env
+    [ -n "$DB_TYPE" ] && sed -i "s|^DB_TYPE=.*|DB_TYPE=$DB_TYPE|" noharm.env
+    [ -n "$DB_HOST" ] && sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" noharm.env
+    [ -n "$DB_DATABASE" ] && sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" noharm.env
+    [ -n "$DB_PORT" ] && sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" noharm.env
+    [ -n "$DB_USER" ] && sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" noharm.env
+    [ -n "$DB_PASS" ] && sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" noharm.env
+    [ -n "$DB_QUERY" ] && sed -i "s|^DB_QUERY=.*|DB_QUERY=$DB_QUERY|" noharm.env
+    [ -n "$DB_MULTI_QUERY" ] && sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=$DB_MULTI_QUERY|" noharm.env
 
     echo "Arquivo noharm.env atualizado com sucesso."
 }
