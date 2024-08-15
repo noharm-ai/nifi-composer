@@ -43,7 +43,9 @@ install_containers() {
     echo "Instalando containers com Docker Compose..."
     git clone https://github.com/noharm-ai/nifi-composer/
     cd nifi-composer/
-    ./update_secrets.sh
+    
+    # Gera a senha antes de iniciar os containers
+    generate_password
 
     update_env_file
 
