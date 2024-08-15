@@ -72,7 +72,7 @@ validate_requirements() {
     echo "vCPUs disponíveis: ${VCPUS}"
 
     if [[ "$DISK_TOTAL" -lt 100 ]]; then
-        echo "Espaço total em disco. Necessário pelo menos 100GB."
+        echo "Espaço total em disco insuficiente. Necessário pelo menos 100GB."
         exit 1
     fi
 
@@ -82,7 +82,7 @@ validate_requirements() {
     fi
 
     if [[ "$MEM_TOTAL" -lt 4096 ]]; then
-        echo "Memória total. Necessário pelo menos 4GB."
+        echo "Memória total insuficiente. Necessário pelo menos 4GB."
         exit 1
     fi
 
