@@ -139,14 +139,21 @@ configure_docker_non_root() {
     # Mudança de proprietário do socket do Docker
     sudo chown $USER /var/run/docker.sock
 
-    # Tenta adicionar o grupo "docker", mas ignora o erro se o grupo já existir
-    sudo groupadd docker 2>/dev/null || echo "Grupo 'docker' já existe, continuando..."
+    # Verifica se o grupo "docker" já existe
+    if getent group docker > /dev/null 2>&1; then
+        echo "Grupo 'docker' já existe, continuando..."
+    else
+        sudo groupadd docker
+        echo "Grupo 'docker' criado com sucesso."
+    fi
     
     # Adiciona o usuário atual ao grupo "docker"
     sudo usermod -aG docker $USER
     
-    # Aplica as mudanças de grupo no shell atual
-    newgrp docker
+    # Usar newgrp em uma subshell para não interromper o script
+    su - $USER -c "newgrp docker && echo 'Grupo atualizado, continuando com o script...'"
+
+    echo "Configuração do Docker como usuário não-root concluída."
 }
 
 test_docker() {
