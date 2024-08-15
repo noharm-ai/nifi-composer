@@ -209,7 +209,7 @@ test_services() {
 }
 
 main() {
-    if [ "$#" -ne 13 ]; então
+    if [ "$#" -ne 13 ]; then
         echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
         exit 1
     fi
@@ -230,9 +230,9 @@ main() {
 
     validate_requirements
 
-    if [[ -f /etc/debian_version ]]; então
+    if [[ -f /etc/debian_version ]]; then
         install_docker_ubuntu_debian
-    elif [[ -f /etc/redhat-release ]]; então
+    elif [[ -f /etc/redhat-release ]]; then
         install_docker_rpm_based
     else
         echo "Distribuição Linux não suportada."
