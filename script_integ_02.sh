@@ -23,8 +23,10 @@ update_env_file() {
     [ -n "$DB_PORT" ] && sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" noharm.env
     [ -n "$DB_USER" ] && sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" noharm.env
     [ -n "$DB_PASS" ] && sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" noharm.env
-    [ -n "$DB_QUERY" ] && sed -i "s|^DB_QUERY=.*|DB_QUERY=$DB_QUERY|" noharm.env
-    [ -n "$DB_MULTI_QUERY" ] && sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=$DB_MULTI_QUERY|" noharm.env
+
+    # As variáveis DB_QUERY e DB_MULTI_QUERY agora contêm apenas os valores, então construímos as consultas aqui
+    [ -n "$DB_QUERY" ] && sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
+    [ -n "$DB_MULTI_QUERY" ] && sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
 
     echo "Arquivo noharm.env atualizado com sucesso."
 }
@@ -36,7 +38,13 @@ generate_password() {
     # Executa o script para gerar e substituir a senha
     ./update_secrets.sh
 
+    # Captura a senha gerada no arquivo noharm.env
+    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
+
+    # Exibe a senha gerada no console com a mensagem solicitada
     echo "Senha gerada e aplicada no arquivo noharm.env."
+    echo "A senha gerada para o usuário 'nifi_noharm' é: $PASSWORD"
+    echo "Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
 }
 
 install_containers() {
@@ -79,6 +87,17 @@ test_services() {
         http://localhost/clean -d '{"TEXT" : "FISIOTERAPIA TRAUMATO - MANHÃ Henrique Dias, 38 anos. Exercícios metabólicos de extremidades inferiores. Realizo mobilização patelar e leve mobilização de flexão de joelho conforme liberado pelo Dr Marcelo Arocha. Oriento cuidados e posicionamentos."}'
 }
 
+restart_services() {
+    echo "Reiniciando todos os serviços após a execução dos testes..."
+    
+    # Reiniciando os containers
+    docker restart noharm-nifi
+    docker restart noharm-anony
+    docker restart noharm-getname
+    
+    echo "Todos os serviços foram reiniciados com sucesso!"
+}
+
 main() {
     if [ "$#" -ne 13 ]; then
         echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
@@ -94,14 +113,16 @@ main() {
     DB_PORT=$7
     DB_USER=$8
     DB_PASS=$9
-    DB_QUERY=${10}
-    DB_MULTI_QUERY=${11}
+    DB_QUERY=${10}  # Passa apenas o valor
+    DB_MULTI_QUERY=${11}  # Passa apenas os valores
     CLIENT_NAME=${12}
     PATIENT_ID=${13}
 
     test_docker
     install_containers
     test_services
+
+    restart_services
 
     echo "Script executado com sucesso!"
 }
