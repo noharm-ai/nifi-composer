@@ -8,6 +8,23 @@ check_status() {
     fi
 }
 
+setup_docker_proxy() {
+    echo "### Verificando se é necessário configurar proxy para Docker..."
+    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ]; then
+        echo "### Configurando proxy para Docker..."
+        sudo mkdir -p /etc/systemd/system/docker.service.d
+        echo "[Service]" | sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf > /dev/null
+        echo "Environment=\"HTTP_PROXY=$HTTP_PROXY\"" | sudo tee -a /etc/systemd/system/docker.service.d/http-proxy.conf > /dev/null
+        echo "Environment=\"HTTPS_PROXY=$HTTPS_PROXY\"" | sudo tee -a /etc/systemd/system/docker.service.d/http-proxy.conf > /dev/null
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+        check_status "Falha ao configurar o proxy para Docker"
+        echo "### Proxy configurado com sucesso."
+    else
+        echo "### Nenhum proxy configurado."
+    fi
+}
+
 test_docker() {
     echo "### Testando instalação do Docker..."
     if ! docker ps > /dev/null 2>&1; then
@@ -19,10 +36,39 @@ test_docker() {
     echo "### Docker está funcionando corretamente."
 }
 
+retry_docker_pull() {
+    retry_count=0
+    max_retries=6
+    success=false
+
+    while [ $retry_count -lt $max_retries ]; do
+        echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
+        docker compose up -d
+        if [ $? -eq 0 ]; then
+            success=true
+            break
+        fi
+        echo "### Falha ao fazer pull da imagem, aguardando antes de tentar novamente..."
+        sleep 30
+        retry_count=$((retry_count+1))
+    done
+
+    if [ "$success" = false ]; then
+        echo "### Erro: Não foi possível fazer pull da imagem após $max_retries tentativas. Verifique sua conexão e tente novamente."
+        exit 1
+    fi
+}
+
+clear_docker_cache() {
+    echo "### Limpando cache do Docker..."
+    docker system prune -a -f
+    check_status "Falha ao limpar cache do Docker"
+    echo "### Cache do Docker limpo com sucesso."
+}
+
 update_env_file() {
     echo "### Atualizando variáveis de ambiente no arquivo noharm.env..."
 
-    # Atualiza somente as variáveis passadas como argumento
     [ -n "$AWS_ACCESS_KEY_ID" ] && sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" noharm.env
     [ -n "$AWS_SECRET_ACCESS_KEY" ] && sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" noharm.env
     [ -n "$GETNAME_SSL_URL" ] && sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" noharm.env
@@ -33,26 +79,19 @@ update_env_file() {
     [ -n "$DB_USER" ] && sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" noharm.env
     [ -n "$DB_PASS" ] && sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" noharm.env
 
-    # Verifica se uma query customizada foi passada ou se é necessário usar a query padrão
     if [[ "$DB_QUERY" =~ \{\} ]]; then
-        # Se a query contém '{}', usa como query customizada
         sed -i "s|^DB_QUERY=.*|DB_QUERY=\"$DB_QUERY\"|" noharm.env
     elif [ -n "$DB_QUERY" ]; then
-        # Caso contrário, usa a query padrão e insere o valor
         sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
     else
-        # Mantém a query padrão com o placeholder
         sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = {}|" noharm.env
     fi
 
     if [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
-        # Se a query contém '{}', usa como query customizada
         sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=\"$DB_MULTI_QUERY\"|" noharm.env
     elif [ -n "$DB_MULTI_QUERY" ]; then
-        # Caso contrário, usa a query padrão e insere os valores
         sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
     else
-        # Mantém a query padrão com o placeholder
         sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" noharm.env
     fi
 
@@ -61,8 +100,7 @@ update_env_file() {
 
 generate_password() {
     echo "### Gerando senha para o usuário nifi_noharm..."
-    
-    # Verifica se a pasta 'nifi-composer' já existe, se sim, remove
+
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Excluindo..."
         rm -rf nifi-composer
@@ -84,7 +122,6 @@ generate_password() {
 install_containers() {
     echo "### Instalando containers com Docker Compose..."
 
-    # Se a pasta 'nifi-composer' já existir, remove e clona novamente
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Excluindo..."
         rm -rf nifi-composer
@@ -100,14 +137,7 @@ install_containers() {
     update_env_file
 
     echo "### Iniciando containers..."
-    docker compose up -d
-    check_status "Falha ao iniciar os containers com Docker Compose"
-
-    echo "### Aguardando containers iniciarem..."
-    sleep 20  # Pode ajustar o tempo conforme necessário
-
-    echo "### Verificando status dos containers..."
-    docker ps
+    retry_docker_pull
 }
 
 test_services() {
@@ -137,39 +167,4 @@ restart_services() {
 
 main() {
     if [ "$#" -lt 13 ]; then
-        echo "### Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
-        exit 1
-    fi
-
-    AWS_ACCESS_KEY_ID=$1
-    AWS_SECRET_ACCESS_KEY=$2
-    GETNAME_SSL_URL=$3
-    DB_TYPE=$4
-    DB_HOST=$5
-    DB_DATABASE=$6
-    DB_PORT=$7
-    DB_USER=$8
-    DB_PASS=$9
-    DB_QUERY=${10}  # Passa a consulta ou o valor
-    DB_MULTI_QUERY=${11}  # Passa a consulta ou os valores
-    CLIENT_NAME=${12}
-    PATIENT_ID=${13}
-
-    if [ -n "$ID_PATIENT" ] && [[ "$DB_QUERY" =~ \{\} ]]; then
-        DB_QUERY=$(echo "$DB_QUERY" | sed "s|{}|$ID_PATIENT|")
-    fi
-
-    if [ -n "$IDS_PATIENT" ] && [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
-        DB_MULTI_QUERY=$(echo "$DB_MULTI_QUERY" | sed "s|{}|$IDS_PATIENT|")
-    fi
-
-    test_docker
-    install_containers
-    test_services
-
-    restart_services
-
-    echo "### Script executado com sucesso!"
-}
-
-main "$@"
+        echo "### Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <
