@@ -8,7 +8,7 @@ check_status() {
     fi
 }
 
-# Função para gerar a senha para o usuário nifi_noharm e clonar o repositório
+# Função para clonar o repositório e gerar a senha para o usuário nifi_noharm
 clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
 
@@ -33,8 +33,9 @@ clone_repository_and_generate_password() {
 cleanup_containers() {
     echo "### Parando e removendo containers e volumes..."
     
-    # Certifique-se de que estamos no diretório correto para rodar o docker compose down
-    if [ -f "docker-compose.yml" ]; then
+    # Certifique-se de que o arquivo docker-compose.yml foi clonado antes de tentar remover containers
+    if [ -f "nifi-composer/docker-compose.yml" ]; then
+        cd nifi-composer
         docker compose down --volumes --remove-orphans
         check_status "Falha ao parar e remover containers"
         echo "### Containers removidos com sucesso."
@@ -175,9 +176,9 @@ main() {
 
     # Verifica se REINSTALL_MODE está "true"
     if [[ "$REINSTALL_MODE" == "true" ]]; then
-        echo "### Modo de reinstalação ativado. Excluindo containers e pastas e começando do zero..."
-        cleanup_containers
+        echo "### Modo de reinstalação ativado. Clonando repositório e reiniciando do zero..."
         clone_repository_and_generate_password
+        cleanup_containers
         install_containers
     else
         echo "### Modo de execução sem reinstalação. Verificando estado atual..."
