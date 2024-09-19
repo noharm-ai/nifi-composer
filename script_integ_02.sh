@@ -8,23 +8,6 @@ check_status() {
     fi
 }
 
-setup_docker_proxy() {
-    echo "### Verificando se é necessário configurar proxy para Docker..."
-    if [ -n "$HTTP_PROXY" ] || [ -n "$HTTPS_PROXY" ]; then
-        echo "### Configurando proxy para Docker..."
-        sudo mkdir -p /etc/systemd/system/docker.service.d
-        echo "[Service]" | sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf > /dev/null
-        echo "Environment=\"HTTP_PROXY=$HTTP_PROXY\"" | sudo tee -a /etc/systemd/system/docker.service.d/http-proxy.conf > /dev/null
-        echo "Environment=\"HTTPS_PROXY=$HTTPS_PROXY\"" | sudo tee -a /etc/systemd/system/docker.service.d/http-proxy.conf > /dev/null
-        sudo systemctl daemon-reload
-        sudo systemctl restart docker
-        check_status "Falha ao configurar o proxy para Docker"
-        echo "### Proxy configurado com sucesso."
-    else
-        echo "### Nenhum proxy configurado."
-    fi
-}
-
 test_docker() {
     echo "### Testando instalação do Docker..."
     if ! docker ps > /dev/null 2>&1; then
@@ -36,21 +19,11 @@ test_docker() {
     echo "### Docker está funcionando corretamente."
 }
 
-check_connectivity() {
-    echo "### Verificando conectividade com o Docker Hub..."
-    curl -s https://hub.docker.com > /dev/null
-    if [ $? -ne 0 ]; then
-        echo "### Erro: Não foi possível conectar ao Docker Hub. Verifique sua conexão de rede."
-        exit 1
-    fi
-    echo "### Conectividade com Docker Hub OK."
-}
-
 retry_docker_pull() {
     retry_count=0
-    max_retries=6
+    max_retries=3
     success=false
-    sleep_time=60  # 60 segundos entre tentativas
+    sleep_time=30  # 30 segundos entre tentativas
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
@@ -71,21 +44,21 @@ retry_docker_pull() {
     fi
 }
 
-install_aws_cli_in_container() {
-    container_name=$1
+install_aws_cli_in_nifi() {
+    container_name="noharm-nifi"
     echo "### Instalando AWS CLI no container $container_name..."
     docker exec --user="root" -it "$container_name" apt update
     docker exec --user="root" -it "$container_name" apt install awscli -y
     check_status "Falha ao instalar AWS CLI no container $container_name"
 }
 
-test_aws_cli_in_container() {
-    container_name=$1
+test_aws_cli_in_nifi() {
+    container_name="noharm-nifi"
     echo "### Verificando se o AWS CLI está funcionando dentro do container $container_name..."
     docker exec --user="root" -it "$container_name" /bin/bash -c "aws --version"
     if [ $? -ne 0 ]; then
         echo "### AWS CLI não está instalado no container $container_name. Tentando instalar..."
-        install_aws_cli_in_container "$container_name"
+        install_aws_cli_in_nifi
     else
         echo "### AWS CLI está instalado corretamente no container $container_name."
     fi
@@ -161,15 +134,13 @@ install_containers() {
     generate_password
     update_env_file
 
-    check_connectivity
-
     echo "### Iniciando containers..."
     retry_docker_pull
 }
 
 test_services() {
     echo "### Verificando se o AWS CLI está funcionando dentro do container noharm-nifi..."
-    test_aws_cli_in_container "noharm-nifi"
+    test_aws_cli_in_nifi
 }
 
 restart_services() {
