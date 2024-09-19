@@ -167,4 +167,39 @@ restart_services() {
 
 main() {
     if [ "$#" -lt 13 ]; then
-        echo "### Uso: $0 <AWS_ACCESS_KEY_ID>
+        echo "### Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
+        exit 1
+    fi
+
+    AWS_ACCESS_KEY_ID=$1
+    AWS_SECRET_ACCESS_KEY=$2
+    GETNAME_SSL_URL=$3
+    DB_TYPE=$4
+    DB_HOST=$5
+    DB_DATABASE=$6
+    DB_PORT=$7
+    DB_USER=$8
+    DB_PASS=$9
+    DB_QUERY=${10}  # Passa a consulta ou o valor
+    DB_MULTI_QUERY=${11}  # Passa a consulta ou os valores
+    CLIENT_NAME=${12}
+    PATIENT_ID=${13}
+
+    if [ -n "$ID_PATIENT" ] && [[ "$DB_QUERY" =~ \{\} ]]; then
+        DB_QUERY=$(echo "$DB_QUERY" | sed "s|{}|$ID_PATIENT|")
+    fi
+
+    if [ -n "$IDS_PATIENT" ] && [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
+        DB_MULTI_QUERY=$(echo "$DB_MULTI_QUERY" | sed "s|{}|$IDS_PATIENT|")
+    fi
+
+    test_docker
+    install_containers
+    test_services
+
+    restart_services
+
+    echo "### Script executado com sucesso!"
+}
+
+main "$@"
