@@ -24,18 +24,9 @@ update_env_file() {
     [ -n "$DB_USER" ] && sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" noharm.env
     [ -n "$DB_PASS" ] && sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" noharm.env
 
-    # Verifica se a query completa foi passada ou se estamos utilizando o padrão
-    if [ -n "$CUSTOM_DB_QUERY" ]; then
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=$CUSTOM_DB_QUERY|" noharm.env
-    else
-        [ -n "$PATIENT_CODES" ] && sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $PATIENT_CODES|" noharm.env
-    fi
-
-    if [ -n "$CUSTOM_DB_MULTI_QUERY" ]; then
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=$CUSTOM_DB_MULTI_QUERY|" noharm.env
-    else
-        [ -n "$PATIENT_MULTI_CODES" ] && sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($PATIENT_MULTI_CODES)|" noharm.env
-    fi
+    # As variáveis DB_QUERY e DB_MULTI_QUERY agora contêm apenas os valores, então construímos as consultas aqui
+    [ -n "$DB_QUERY" ] && sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
+    [ -n "$DB_MULTI_QUERY" ] && sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
 
     echo "Arquivo noharm.env atualizado com sucesso."
 }
@@ -108,8 +99,8 @@ restart_services() {
 }
 
 main() {
-    if [ "$#" -lt 13 ]; then
-        echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <PATIENT_CODES> <PATIENT_MULTI_CODES> <CLIENT_NAME> <PATIENT_ID> [<CUSTOM_DB_QUERY> <CUSTOM_DB_MULTI_QUERY>]"
+    if [ "$#" -ne 13 ]; then
+        echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
         exit 1
     fi
 
@@ -122,12 +113,10 @@ main() {
     DB_PORT=$7
     DB_USER=$8
     DB_PASS=$9
-    PATIENT_CODES=${10}  # Códigos padrão dos pacientes
-    PATIENT_MULTI_CODES=${11}  # Códigos múltiplos dos pacientes
+    DB_QUERY=${10}  # Passa apenas o valor
+    DB_MULTI_QUERY=${11}  # Passa apenas os valores
     CLIENT_NAME=${12}
     PATIENT_ID=${13}
-    CUSTOM_DB_QUERY=${14:-}  # Query completa, opcional
-    CUSTOM_DB_MULTI_QUERY=${15:-}  # Query completa múltipla, opcional
 
     test_docker
     install_containers
