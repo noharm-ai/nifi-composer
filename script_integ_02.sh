@@ -8,23 +8,40 @@ check_status() {
     fi
 }
 
+# Função para gerar a senha para o usuário nifi_noharm e clonar o repositório
+clone_repository_and_generate_password() {
+    echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
+
+    if [ -d "nifi-composer" ]; then
+        echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
+        rm -rf nifi-composer
+    fi
+
+    git clone https://github.com/noharm-ai/nifi-composer/
+    check_status "Falha ao clonar o repositório 'nifi-composer'"
+
+    cd nifi-composer/
+    ./update_secrets.sh
+    check_status "Falha ao executar o script 'update_secrets.sh'"
+
+    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
+    echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
+    echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
+}
+
 # Função para parar e remover containers, redes, volumes, e imagens
 cleanup_containers() {
     echo "### Parando e removendo containers e volumes..."
-    docker compose down --volumes --remove-orphans
-    check_status "Falha ao parar e remover containers"
-    echo "### Containers removidos com sucesso."
-}
-
-# Função para apagar pastas existentes
-cleanup_directories() {
-    echo "### Removendo diretórios e arquivos existentes..."
-    if [ -d "nifi-composer" ]; then
-        echo "### Pasta 'nifi-composer' encontrada. Excluindo..."
-        rm -rf nifi-composer
-        check_status "Falha ao remover a pasta 'nifi-composer'"
+    
+    # Certifique-se de que estamos no diretório correto para rodar o docker compose down
+    if [ -f "docker-compose.yml" ]; then
+        docker compose down --volumes --remove-orphans
+        check_status "Falha ao parar e remover containers"
+        echo "### Containers removidos com sucesso."
+    else
+        echo "### Erro: docker-compose.yml não encontrado. Certifique-se de que o repositório foi clonado corretamente."
+        exit 1
     fi
-    echo "### Diretórios e arquivos antigos removidos com sucesso."
 }
 
 # Função para realizar o pull de containers com tentativas e espera
@@ -32,7 +49,7 @@ retry_docker_pull() {
     retry_count=0
     max_retries=3
     success=false
-    sleep_time=30  # 30 segundos entre tentativas
+    sleep_time=30  # 60 segundos entre tentativas
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
@@ -75,19 +92,20 @@ test_aws_cli_in_nifi() {
     fi
 }
 
-# Função para gerar a senha para o usuário nifi_noharm
-generate_password() {
-    echo "### Gerando senha para o usuário nifi_noharm..."
-    git clone https://github.com/noharm-ai/nifi-composer/
-    check_status "Falha ao clonar o repositório 'nifi-composer'"
+# Função para testar os serviços configurados
+test_services() {
+    echo "### Verificando se o AWS CLI está funcionando dentro do container..."
+    docker exec --user="root" -it noharm-nifi /bin/bash -c "aws s3 ls && exit"
+    check_status "Falha ao verificar o AWS CLI no container noharm-nifi"
 
-    cd nifi-composer/
-    ./update_secrets.sh
-    check_status "Falha ao executar o script 'update_secrets.sh'"
+    echo "### Verificando se o serviço está funcionando para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID..."
+    curl "https://$CLIENT_NAME.getname.noharm.ai/patient-name/$PATIENT_ID"
+    check_status "Falha ao verificar o serviço para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID"
 
-    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
-    echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
-    echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
+    echo "### Executando teste simples no serviço Anony..."
+    curl -X PUT -H 'Accept: application/json' -H 'Content-Type: application/json' \
+        http://localhost/clean -d '{"TEXT" : "FISIOTERAPIA TRAUMATO - MANHÃ Henrique Dias, 38 anos. Exercícios metabólicos de extremidades inferiores. Realizo mobilização patelar e leve mobilização de flexão de joelho conforme liberado pelo Dr Marcelo Arocha. Oriento cuidados e posicionamentos."}'
+    check_status "Falha ao testar o serviço Anony"
 }
 
 # Função para atualizar o arquivo de ambiente
@@ -127,7 +145,6 @@ update_env_file() {
 install_containers() {
     echo "### Instalando containers com Docker Compose..."
 
-    generate_password
     update_env_file
 
     echo "### Iniciando containers com retry..."
@@ -160,12 +177,13 @@ main() {
     if [[ "$REINSTALL_MODE" == "true" ]]; then
         echo "### Modo de reinstalação ativado. Excluindo containers e pastas e começando do zero..."
         cleanup_containers
-        cleanup_directories
+        clone_repository_and_generate_password
         install_containers
     else
         echo "### Modo de execução sem reinstalação. Verificando estado atual..."
         if [ ! "$(docker ps -q -f name=noharm-nifi)" ]; then
             echo "### Container 'noharm-nifi' não encontrado. Iniciando containers..."
+            clone_repository_and_generate_password
             install_containers
         else
             echo "### Container 'noharm-nifi' já está em execução. Pulando a reinstalação."
@@ -175,11 +193,8 @@ main() {
     # Verificação e instalação do AWS CLI no noharm-nifi
     test_aws_cli_in_nifi
 
-    # Reinicia todos os serviços se necessário
-    echo "### Reiniciando os serviços..."
-    docker restart noharm-nifi || echo "### Aviso: Falha ao reiniciar o container noharm-nifi"
-    docker restart noharm-anony || echo "### Aviso: Falha ao reiniciar o container noharm-anony"
-    docker restart noharm-getname || echo "### Aviso: Falha ao reiniciar o container noharm-getname"
+    # Testa se os serviços estão funcionando corretamente
+    test_services
 
     echo "### Script executado com sucesso!"
 }
