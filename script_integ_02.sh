@@ -11,7 +11,7 @@ check_status() {
 # Função para parar e remover containers, redes, volumes, e imagens
 cleanup_containers() {
     echo "### Parando e removendo containers e volumes..."
-    docker-compose down --volumes --remove-orphans
+    docker compose down --volumes --remove-orphans
     check_status "Falha ao parar e remover containers"
     echo "### Containers removidos com sucesso."
 }
