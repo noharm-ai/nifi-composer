@@ -156,7 +156,8 @@ main() {
     CLIENT_NAME=${13}
     PATIENT_ID=${14}
 
-    if [ "$REINSTALL_MODE" == "true" ]; then
+    # Verifica se REINSTALL_MODE está "true"
+    if [[ "$REINSTALL_MODE" == "true" ]]; then
         echo "### Modo de reinstalação ativado. Excluindo containers e pastas e começando do zero..."
         cleanup_containers
         cleanup_directories
