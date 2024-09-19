@@ -27,6 +27,8 @@ clone_repository_and_generate_password() {
     PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
     echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
     echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
+
+    cd ..  # Voltando ao diretório anterior após clonar e gerar senha
 }
 
 # Função para parar e remover containers, redes, volumes, e imagens
@@ -35,10 +37,11 @@ cleanup_containers() {
     
     # Certifique-se de que o arquivo docker-compose.yml foi clonado antes de tentar remover containers
     if [ -f "nifi-composer/docker-compose.yml" ]; then
-        cd nifi-composer
+        cd nifi-composer  # Entrando no diretório correto onde está o docker-compose.yml
         docker compose down --volumes --remove-orphans
         check_status "Falha ao parar e remover containers"
         echo "### Containers removidos com sucesso."
+        cd ..  # Voltando ao diretório original
     else
         echo "### Erro: docker-compose.yml não encontrado. Certifique-se de que o repositório foi clonado corretamente."
         exit 1
