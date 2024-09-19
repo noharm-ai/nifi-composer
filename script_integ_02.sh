@@ -36,10 +36,21 @@ test_docker() {
     echo "### Docker está funcionando corretamente."
 }
 
+check_connectivity() {
+    echo "### Verificando conectividade com o Docker Hub..."
+    curl -s https://hub.docker.com > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "### Erro: Não foi possível conectar ao Docker Hub. Verifique sua conexão de rede."
+        exit 1
+    fi
+    echo "### Conectividade com Docker Hub OK."
+}
+
 retry_docker_pull() {
     retry_count=0
     max_retries=6
     success=false
+    sleep_time=60  # 60 segundos entre tentativas
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
@@ -48,9 +59,10 @@ retry_docker_pull() {
             success=true
             break
         fi
-        echo "### Falha ao fazer pull da imagem, aguardando antes de tentar novamente..."
-        sleep 30
+        echo "### Falha ao fazer pull da imagem, aguardando $sleep_time segundos antes de tentar novamente..."
+        sleep $sleep_time
         retry_count=$((retry_count+1))
+        sleep_time=$((sleep_time + 30))  # Aumentar o tempo de espera a cada tentativa
     done
 
     if [ "$success" = false ]; then
@@ -136,6 +148,8 @@ install_containers() {
     generate_password
     update_env_file
 
+    check_connectivity
+
     echo "### Iniciando containers..."
     retry_docker_pull
 }
@@ -194,6 +208,7 @@ main() {
     fi
 
     test_docker
+    clear_docker_cache
     install_containers
     test_services
 
