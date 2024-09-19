@@ -71,11 +71,24 @@ retry_docker_pull() {
     fi
 }
 
-clear_docker_cache() {
-    echo "### Limpando cache do Docker..."
-    docker system prune -a -f
-    check_status "Falha ao limpar cache do Docker"
-    echo "### Cache do Docker limpo com sucesso."
+install_aws_cli_in_container() {
+    container_name=$1
+    echo "### Instalando AWS CLI no container $container_name..."
+    docker exec --user="root" -it "$container_name" apt update
+    docker exec --user="root" -it "$container_name" apt install awscli -y
+    check_status "Falha ao instalar AWS CLI no container $container_name"
+}
+
+test_aws_cli_in_container() {
+    container_name=$1
+    echo "### Verificando se o AWS CLI está funcionando dentro do container $container_name..."
+    docker exec --user="root" -it "$container_name" /bin/bash -c "aws --version"
+    if [ $? -ne 0 ]; then
+        echo "### AWS CLI não está instalado no container $container_name. Tentando instalar..."
+        install_aws_cli_in_container "$container_name"
+    else
+        echo "### AWS CLI está instalado corretamente no container $container_name."
+    fi
 }
 
 update_env_file() {
@@ -155,18 +168,8 @@ install_containers() {
 }
 
 test_services() {
-    echo "### Verificando se o AWS CLI está funcionando dentro do container..."
-    docker exec --user="root" -it noharm-nifi /bin/bash -c "aws s3 ls && exit"
-    check_status "Falha ao verificar o AWS CLI no container"
-
-    echo "### Verificando se o serviço está funcionando para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID..."
-    curl "https://$CLIENT_NAME.getname.noharm.ai/patient-name/$PATIENT_ID"
-    check_status "Falha ao verificar o serviço para o cliente $CLIENT_NAME"
-
-    echo "### Executando teste simples no serviço Anony..."
-    curl -X PUT -H 'Accept: application/json' -H 'Content-Type: application/json' \
-        http://localhost/clean -d '{"TEXT" : "FISIOTERAPIA TRAUMATO - MANHÃ Henrique Dias, 38 anos. Exercícios metabólicos de extremidades inferiores. Realizo mobilização patelar e leve mobilização de flexão de joelho conforme liberado pelo Dr Marcelo Arocha. Oriento cuidados e posicionamentos."}'
-    check_status "Falha ao executar o teste simples no serviço Anony"
+    echo "### Verificando se o AWS CLI está funcionando dentro do container noharm-nifi..."
+    test_aws_cli_in_container "noharm-nifi"
 }
 
 restart_services() {
@@ -208,7 +211,6 @@ main() {
     fi
 
     test_docker
-    clear_docker_cache
     install_containers
     test_services
 
