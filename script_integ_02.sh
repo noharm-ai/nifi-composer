@@ -24,9 +24,28 @@ update_env_file() {
     [ -n "$DB_USER" ] && sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" noharm.env
     [ -n "$DB_PASS" ] && sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" noharm.env
 
-    # As variáveis DB_QUERY e DB_MULTI_QUERY agora contêm apenas os valores, então construímos as consultas aqui
-    [ -n "$DB_QUERY" ] && sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
-    [ -n "$DB_MULTI_QUERY" ] && sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
+    # Verifica se uma query customizada foi passada ou se é necessário usar a query padrão
+    if [[ "$DB_QUERY" =~ \{\} ]]; then
+        # Se a query contém '{}', usa como query customizada
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=$DB_QUERY|" noharm.env
+    elif [ -n "$DB_QUERY" ]; then
+        # Caso contrário, usa a query padrão e insere o valor
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
+    else
+        # Mantém a query padrão com o placeholder
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = {}|" noharm.env
+    fi
+
+    if [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
+        # Se a query contém '{}', usa como query customizada
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=$DB_MULTI_QUERY|" noharm.env
+    elif [ -n "$DB_MULTI_QUERY" ]; then
+        # Caso contrário, usa a query padrão e insere os valores
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
+    else
+        # Mantém a query padrão com o placeholder
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" noharm.env
+    fi
 
     echo "Arquivo noharm.env atualizado com sucesso."
 }
@@ -99,7 +118,7 @@ restart_services() {
 }
 
 main() {
-    if [ "$#" -ne 13 ]; then
+    if [ "$#" -lt 12 ]; then
         echo "Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
         exit 1
     fi
@@ -113,8 +132,8 @@ main() {
     DB_PORT=$7
     DB_USER=$8
     DB_PASS=$9
-    DB_QUERY=${10}  # Passa apenas o valor
-    DB_MULTI_QUERY=${11}  # Passa apenas os valores
+    DB_QUERY=${10}  # Passa a consulta ou o valor
+    DB_MULTI_QUERY=${11}  # Passa a consulta ou os valores
     CLIENT_NAME=${12}
     PATIENT_ID=${13}
 
