@@ -27,7 +27,7 @@ update_env_file() {
     # Verifica se uma query customizada foi passada ou se é necessário usar a query padrão
     if [[ "$DB_QUERY" =~ \{\} ]]; then
         # Se a query contém '{}', usa como query customizada
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=$DB_QUERY|" noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=\"$DB_QUERY\"|" noharm.env
     elif [ -n "$DB_QUERY" ]; then
         # Caso contrário, usa a query padrão e insere o valor
         sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
@@ -38,7 +38,7 @@ update_env_file() {
 
     if [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
         # Se a query contém '{}', usa como query customizada
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=$DB_MULTI_QUERY|" noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=\"$DB_MULTI_QUERY\"|" noharm.env
     elif [ -n "$DB_MULTI_QUERY" ]; then
         # Caso contrário, usa a query padrão e insere os valores
         sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
@@ -136,6 +136,14 @@ main() {
     DB_MULTI_QUERY=${11}  # Passa a consulta ou os valores
     CLIENT_NAME=${12}
     PATIENT_ID=${13}
+
+    if [ -n "$ID_PATIENT" ] && [[ "$DB_QUERY" =~ \{\} ]]; then
+        DB_QUERY=$(echo "$DB_QUERY" | sed "s|{}|$ID_PATIENT|")
+    fi
+
+    if [ -n "$IDS_PATIENT" ] && [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
+        DB_MULTI_QUERY=$(echo "$DB_MULTI_QUERY" | sed "s|{}|$IDS_PATIENT|")
+    fi
 
     test_docker
     install_containers
