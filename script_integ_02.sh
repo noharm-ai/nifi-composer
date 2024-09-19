@@ -8,17 +8,26 @@ check_status() {
     fi
 }
 
-test_docker() {
-    echo "### Testando instalação do Docker..."
-    if ! docker ps > /dev/null 2>&1; then
-        echo "### Docker não está rodando, iniciando serviço..."
-        sudo systemctl start docker
-        check_status "Falha ao iniciar o serviço Docker"
-    fi
-    docker ps
-    echo "### Docker está funcionando corretamente."
+# Função para parar e remover containers, redes, volumes, e imagens
+cleanup_containers() {
+    echo "### Parando e removendo containers e volumes..."
+    docker-compose down --volumes --remove-orphans
+    check_status "Falha ao parar e remover containers"
+    echo "### Containers removidos com sucesso."
 }
 
+# Função para apagar pastas existentes
+cleanup_directories() {
+    echo "### Removendo diretórios e arquivos existentes..."
+    if [ -d "nifi-composer" ]; then
+        echo "### Pasta 'nifi-composer' encontrada. Excluindo..."
+        rm -rf nifi-composer
+        check_status "Falha ao remover a pasta 'nifi-composer'"
+    fi
+    echo "### Diretórios e arquivos antigos removidos com sucesso."
+}
+
+# Função para realizar o pull de containers com tentativas e espera
 retry_docker_pull() {
     retry_count=0
     max_retries=3
@@ -44,6 +53,7 @@ retry_docker_pull() {
     fi
 }
 
+# Função para instalar o AWS CLI no container noharm-nifi
 install_aws_cli_in_nifi() {
     container_name="noharm-nifi"
     echo "### Instalando AWS CLI no container $container_name..."
@@ -52,6 +62,7 @@ install_aws_cli_in_nifi() {
     check_status "Falha ao instalar AWS CLI no container $container_name"
 }
 
+# Função para verificar se o AWS CLI está instalado no container noharm-nifi
 test_aws_cli_in_nifi() {
     container_name="noharm-nifi"
     echo "### Verificando se o AWS CLI está funcionando dentro do container $container_name..."
@@ -64,9 +75,25 @@ test_aws_cli_in_nifi() {
     fi
 }
 
+# Função para gerar a senha para o usuário nifi_noharm
+generate_password() {
+    echo "### Gerando senha para o usuário nifi_noharm..."
+    git clone https://github.com/noharm-ai/nifi-composer/
+    check_status "Falha ao clonar o repositório 'nifi-composer'"
+
+    cd nifi-composer/
+    ./update_secrets.sh
+    check_status "Falha ao executar o script 'update_secrets.sh'"
+
+    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
+    echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
+    echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
+}
+
+# Função para atualizar o arquivo de ambiente
 update_env_file() {
     echo "### Atualizando variáveis de ambiente no arquivo noharm.env..."
-
+    
     [ -n "$AWS_ACCESS_KEY_ID" ] && sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" noharm.env
     [ -n "$AWS_SECRET_ACCESS_KEY" ] && sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" noharm.env
     [ -n "$GETNAME_SSL_URL" ] && sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" noharm.env
@@ -96,96 +123,62 @@ update_env_file() {
     echo "### Arquivo noharm.env atualizado com sucesso."
 }
 
-generate_password() {
-    echo "### Gerando senha para o usuário nifi_noharm..."
-
-    if [ -d "nifi-composer" ]; then
-        echo "### Pasta 'nifi-composer' já existe. Excluindo..."
-        rm -rf nifi-composer
-        check_status "Falha ao remover a pasta existente 'nifi-composer'"
-    fi
-
-    git clone https://github.com/noharm-ai/nifi-composer/
-    check_status "Falha ao clonar o repositório 'nifi-composer'"
-
-    cd nifi-composer/
-    ./update_secrets.sh
-    check_status "Falha ao executar o script 'update_secrets.sh'"
-
-    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
-    echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
-    echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
-}
-
+# Função para instalar e iniciar os containers com Docker Compose
 install_containers() {
     echo "### Instalando containers com Docker Compose..."
-
-    if [ -d "nifi-composer" ]; then
-        echo "### Pasta 'nifi-composer' já existe. Excluindo..."
-        rm -rf nifi-composer
-        check_status "Falha ao remover a pasta existente 'nifi-composer'"
-    fi
-
-    git clone https://github.com/noharm-ai/nifi-composer/
-    check_status "Falha ao clonar o repositório 'nifi-composer'"
-
-    cd nifi-composer/
 
     generate_password
     update_env_file
 
-    echo "### Iniciando containers..."
+    echo "### Iniciando containers com retry..."
     retry_docker_pull
 }
 
-test_services() {
-    echo "### Verificando se o AWS CLI está funcionando dentro do container noharm-nifi..."
-    test_aws_cli_in_nifi
-}
-
-restart_services() {
-    echo "### Reiniciando todos os serviços após a execução dos testes..."
-    
-    docker restart noharm-nifi || echo "### Aviso: Falha ao reiniciar o container noharm-nifi"
-    docker restart noharm-anony || echo "### Aviso: Falha ao reiniciar o container noharm-anony"
-    docker restart noharm-getname || echo "### Aviso: Falha ao reiniciar o container noharm-getname"
-
-    echo "### Todos os serviços foram reiniciados (ou foram encontradas falhas)."
-}
-
+# Função principal que controla a execução do script
 main() {
-    if [ "$#" -lt 13 ]; then
-        echo "### Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
+    if [ "$#" -lt 14 ]; then
+        echo "### Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
         exit 1
     fi
 
-    AWS_ACCESS_KEY_ID=$1
-    AWS_SECRET_ACCESS_KEY=$2
-    GETNAME_SSL_URL=$3
-    DB_TYPE=$4
-    DB_HOST=$5
-    DB_DATABASE=$6
-    DB_PORT=$7
-    DB_USER=$8
-    DB_PASS=$9
-    DB_QUERY=${10}  # Passa a consulta ou o valor
-    DB_MULTI_QUERY=${11}  # Passa a consulta ou os valores
-    CLIENT_NAME=${12}
-    PATIENT_ID=${13}
+    REINSTALL_MODE=$1
+    AWS_ACCESS_KEY_ID=$2
+    AWS_SECRET_ACCESS_KEY=$3
+    GETNAME_SSL_URL=$4
+    DB_TYPE=$5
+    DB_HOST=$6
+    DB_DATABASE=$7
+    DB_PORT=$8
+    DB_USER=$9
+    DB_PASS=${10}
+    DB_QUERY=${11}  # Passa a consulta ou o valor
+    DB_MULTI_QUERY=${12}  # Passa a consulta ou os valores
+    CLIENT_NAME=${13}
+    PATIENT_ID=${14}
 
-    if [ -n "$ID_PATIENT" ] && [[ "$DB_QUERY" =~ \{\} ]]; then
-        DB_QUERY=$(echo "$DB_QUERY" | sed "s|{}|$ID_PATIENT|")
+    if [ "$REINSTALL_MODE" == "true" ]; then
+        echo "### Modo de reinstalação ativado. Excluindo containers e pastas e começando do zero..."
+        cleanup_containers
+        cleanup_directories
+        install_containers
+    else
+        echo "### Modo de execução sem reinstalação. Verificando estado atual..."
+        if [ ! "$(docker ps -q -f name=noharm-nifi)" ]; then
+            echo "### Container 'noharm-nifi' não encontrado. Iniciando containers..."
+            install_containers
+        else
+            echo "### Container 'noharm-nifi' já está em execução. Pulando a reinstalação."
+        fi
     fi
 
-    if [ -n "$IDS_PATIENT" ] && [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
-        DB_MULTI_QUERY=$(echo "$DB_MULTI_QUERY" | sed "s|{}|$IDS_PATIENT|")
-    fi
+    # Verificação e instalação do AWS CLI no noharm-nifi
+    test_aws_cli_in_nifi
 
-    test_docker
-    install_containers
-    test_services
-
-    restart_services
+    # Reinicia todos os serviços se necessário
+    echo "### Reiniciando os serviços..."
+    docker restart noharm-nifi || echo "### Aviso: Falha ao reiniciar o container noharm-nifi"
+    docker restart noharm-anony || echo "### Aviso: Falha ao reiniciar o container noharm-anony"
+    docker restart noharm-getname || echo "### Aviso: Falha ao reiniciar o container noharm-getname"
 
     echo "### Script executado com sucesso!"
 }
