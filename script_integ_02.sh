@@ -167,4 +167,4 @@ restart_services() {
 
 main() {
     if [ "$#" -lt 13 ]; then
-        echo "### Uso: $0 <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <
+        echo "### Uso: $0 <AWS_ACCESS_KEY_ID>
