@@ -63,9 +63,9 @@ cleanup_containers() {
 # Função para realizar o pull de containers com tentativas e espera
 retry_docker_pull() {
     retry_count=0
-    max_retries=6
+    max_retries=3
     success=false
-    sleep_time=60  # 60 segundos entre tentativas
+    sleep_time=30  # 30 segundos entre tentativas
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
@@ -219,9 +219,13 @@ main() {
     echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
     echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
 
-    # Exibindo o conteúdo do arquivo noharm.env no console
-    echo "### Exibindo o conteúdo do arquivo noharm.env:"
-    cat nifi-composer/noharm.env
+    # Verificando se o arquivo noharm.env existe e exibindo seu conteúdo
+    if [ -f "nifi-composer/noharm.env" ]; then
+        echo "### Exibindo o conteúdo do arquivo noharm.env:"
+        cat nifi-composer/noharm.env
+    else
+        echo "### Erro: Arquivo noharm.env não encontrado para exibição."
+    fi
 }
 
 main "$@"
