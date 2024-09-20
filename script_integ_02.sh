@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Definir o caminho absoluto para o arquivo noharm.env
+ENV_FILE_PATH="$(pwd)/nifi-composer/noharm.env"
+
 # Função para verificar o status da execução
 check_status() {
     if [ $? -ne 0 ]; then
@@ -21,13 +24,13 @@ clone_repository_and_generate_password() {
     check_status "Falha ao executar o script 'update_secrets.sh'"
 
     # Verificando se o arquivo noharm.env foi criado corretamente
-    if [ ! -f "noharm.env" ]; then
+    if [ ! -f "$ENV_FILE_PATH" ]; then
         echo "### Erro: Arquivo noharm.env não foi encontrado após a execução de update_secrets.sh."
         exit 1
     fi
 
     # Armazenando a senha gerada
-    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
+    PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" "$ENV_FILE_PATH" | cut -d '=' -f2)
 
     cd ..  # Voltando ao diretório anterior após clonar e gerar senha
 }
@@ -122,36 +125,36 @@ update_env_file() {
     echo "### Atualizando variáveis de ambiente no arquivo noharm.env..."
     
     # Verificando se o arquivo noharm.env existe
-    if [ ! -f "nifi-composer/noharm.env" ]; then
+    if [ ! -f "$ENV_FILE_PATH" ]; then
         echo "### Erro: Arquivo noharm.env não encontrado. Verifique a execução de update_secrets.sh."
         exit 1
     fi
     
     # Atualizando o arquivo noharm.env com as variáveis necessárias
-    sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" nifi-composer/noharm.env
-    sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" nifi-composer/noharm.env
-    sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" nifi-composer/noharm.env
-    sed -i "s|^DB_TYPE=.*|DB_TYPE=$DB_TYPE|" nifi-composer/noharm.env
-    sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" nifi-composer/noharm.env
-    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" nifi-composer/noharm.env
-    sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" nifi-composer/noharm.env
-    sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" nifi-composer/noharm.env
-    sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" nifi-composer/noharm.env
+    sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" "$ENV_FILE_PATH"
+    sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" "$ENV_FILE_PATH"
+    sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" "$ENV_FILE_PATH"
+    sed -i "s|^DB_TYPE=.*|DB_TYPE=$DB_TYPE|" "$ENV_FILE_PATH"
+    sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" "$ENV_FILE_PATH"
+    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" "$ENV_FILE_PATH"
+    sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" "$ENV_FILE_PATH"
+    sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" "$ENV_FILE_PATH"
+    sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" "$ENV_FILE_PATH"
 
     if [[ "$DB_QUERY" =~ \{\} ]]; then
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=\"$DB_QUERY\"|" nifi-composer/noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=\"$DB_QUERY\"|" "$ENV_FILE_PATH"
     elif [ -n "$DB_QUERY" ]; then
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" nifi-composer/noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" "$ENV_FILE_PATH"
     else
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = {}|" nifi-composer/noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = {}|" "$ENV_FILE_PATH"
     fi
 
     if [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=\"$DB_MULTI_QUERY\"|" nifi-composer/noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=\"$DB_MULTI_QUERY\"|" "$ENV_FILE_PATH"
     elif [ -n "$DB_MULTI_QUERY" ]; then
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" nifi-composer/noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" "$ENV_FILE_PATH"
     else
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" nifi-composer/noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" "$ENV_FILE_PATH"
     fi
 
     echo "### Arquivo noharm.env atualizado com sucesso."
@@ -220,9 +223,9 @@ main() {
     echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
 
     # Verificando se o arquivo noharm.env existe e exibindo seu conteúdo
-    if [ -f "nifi-composer/noharm.env" ]; then
+    if [ -f "$ENV_FILE_PATH" ]; then
         echo "### Exibindo o conteúdo do arquivo noharm.env:"
-        cat nifi-composer/noharm.env
+        cat "$ENV_FILE_PATH"
     else
         echo "### Erro: Arquivo noharm.env não encontrado para exibição."
     fi
