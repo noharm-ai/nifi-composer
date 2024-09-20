@@ -53,7 +53,7 @@ retry_docker_pull() {
     retry_count=0
     max_retries=3
     success=false
-    sleep_time=30  # 30 segundos entre tentativas
+    sleep_time=30  # 60 segundos entre tentativas
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
