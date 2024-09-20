@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Variável para armazenar a senha gerada
-PASSWORD=""
-
 # Função para verificar o status da execução
 check_status() {
     if [ $? -ne 0 ]; then
@@ -115,18 +112,9 @@ test_aws_cli_in_nifi() {
 
 # Função para testar os serviços configurados
 test_services() {
-    echo "### Verificando se o AWS CLI está funcionando dentro do container..."
-    docker exec --user="root" -it noharm-nifi /bin/bash -c "aws s3 ls && exit"
-    check_status "Falha ao verificar o AWS CLI no container noharm-nifi"
-
     echo "### Verificando se o serviço está funcionando para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID..."
     curl "https://$CLIENT_NAME.getname.noharm.ai/patient-name/$PATIENT_ID"
     check_status "Falha ao verificar o serviço para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID"
-
-    echo "### Executando teste simples no serviço Anony..."
-    curl -X PUT -H 'Accept: application/json' -H 'Content-Type: application/json' \
-        http://localhost/clean -d '{"TEXT" : "FISIOTERAPIA TRAUMATO - MANHÃ Henrique Dias, 38 anos. Exercícios metabólicos de extremidades inferiores. Realizo mobilização patelar e leve mobilização de flexão de joelho conforme liberado pelo Dr Marcelo Arocha. Oriento cuidados e posicionamentos."}'
-    check_status "Falha ao testar o serviço Anony"
 }
 
 # Função para atualizar o arquivo de ambiente
@@ -181,8 +169,8 @@ install_containers() {
 
 # Função principal que controla a execução do script
 main() {
-    if [ "$#" -lt 14 ]; then
-        echo "### Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <DB_MULTI_QUERY> <CLIENT_NAME> <PATIENT_ID>"
+    if [ "$#" -lt 15 ]; then
+        echo "### Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <PATIENT_ID> <DB_MULTI_QUERY> <IDS_PATIENT> <CLIENT_NAME>"
         exit 1
     fi
 
@@ -197,9 +185,10 @@ main() {
     DB_USER=$9
     DB_PASS=${10}
     DB_QUERY=${11}  # Passa a consulta ou o valor
-    DB_MULTI_QUERY=${12}  # Passa a consulta ou os valores
-    CLIENT_NAME=${13}
-    PATIENT_ID=${14}
+    PATIENT_ID=${12}
+    DB_MULTI_QUERY=${13}  # Passa a consulta ou os valores
+    IDS_PATIENT=${14}
+    CLIENT_NAME=${15}
 
     # Verifica se REINSTALL_MODE está "true"
     if [[ "$REINSTALL_MODE" == "true" ]]; then
