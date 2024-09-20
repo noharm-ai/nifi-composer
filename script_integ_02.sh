@@ -14,7 +14,8 @@ clone_repository_and_generate_password() {
 
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
-        rm -rf nifi-composer
+        rm -rf nifi-composer  # Removendo completamente o diretório existente
+        check_status "Falha ao remover a pasta 'nifi-composer'"
     fi
 
     git clone https://github.com/noharm-ai/nifi-composer/
@@ -51,9 +52,9 @@ cleanup_containers() {
 # Função para realizar o pull de containers com tentativas e espera
 retry_docker_pull() {
     retry_count=0
-    max_retries=3
+    max_retries=6
     success=false
-    sleep_time=30  # 60 segundos entre tentativas
+    sleep_time=60  # 60 segundos entre tentativas
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
@@ -179,10 +180,10 @@ main() {
 
     # Verifica se REINSTALL_MODE está "true"
     if [[ "$REINSTALL_MODE" == "true" ]]; then
-        echo "### Modo de reinstalação ativado. Clonando repositório e reiniciando do zero..."
-        clone_repository_and_generate_password
-        cleanup_containers
-        install_containers
+        echo "### Modo de reinstalação ativado. Excluindo pasta e reinstalando do zero..."
+        clone_repository_and_generate_password  # Sempre remove e clona novamente a pasta
+        cleanup_containers  # Remove containers anteriores se necessário
+        install_containers  # Inicia a instalação dos containers
     else
         echo "### Modo de execução sem reinstalação. Verificando estado atual..."
         if [ ! "$(docker ps -q -f name=noharm-nifi)" ]; then
