@@ -12,12 +12,7 @@ check_status() {
 clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
 
-    if [ -d "nifi-composer" ]; then
-        echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
-        rm -rf nifi-composer  # Removendo completamente o diretório existente
-        check_status "Falha ao remover a pasta 'nifi-composer'"
-    fi
-
+    # Clonar o repositório depois de remover o diretório antigo
     git clone https://github.com/noharm-ai/nifi-composer/
     check_status "Falha ao clonar o repositório 'nifi-composer'"
 
@@ -25,11 +20,28 @@ clone_repository_and_generate_password() {
     ./update_secrets.sh
     check_status "Falha ao executar o script 'update_secrets.sh'"
 
+    # Verificando se o arquivo noharm.env foi criado corretamente
+    if [ ! -f "noharm.env" ]; then
+        echo "### Erro: Arquivo noharm.env não foi encontrado após a execução de update_secrets.sh."
+        exit 1
+    fi
+
     PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" noharm.env | cut -d '=' -f2)
     echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
     echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
 
     cd ..  # Voltando ao diretório anterior após clonar e gerar senha
+}
+
+# Função para remover a pasta "nifi-composer" e recomeçar o processo
+remove_and_clone_repository() {
+    if [ -d "nifi-composer" ]; then
+        echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
+        rm -rf nifi-composer  # Removendo completamente o diretório existente
+        check_status "Falha ao remover a pasta 'nifi-composer'"
+    fi
+
+    clone_repository_and_generate_password  # Clona o repositório e gera a senha
 }
 
 # Função para parar e remover containers, redes, volumes, e imagens
@@ -58,6 +70,7 @@ retry_docker_pull() {
 
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
+        cd nifi-composer  # Certificando-se de que estamos no diretório correto
         docker compose up -d
         if [ $? -eq 0 ]; then
             success=true
@@ -67,6 +80,7 @@ retry_docker_pull() {
         sleep $sleep_time
         retry_count=$((retry_count+1))
         sleep_time=$((sleep_time + 30))  # Aumentar o tempo de espera a cada tentativa
+        cd ..  # Voltando ao diretório original
     done
 
     if [ "$success" = false ]; then
@@ -117,30 +131,37 @@ test_services() {
 update_env_file() {
     echo "### Atualizando variáveis de ambiente no arquivo noharm.env..."
     
-    [ -n "$AWS_ACCESS_KEY_ID" ] && sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" noharm.env
-    [ -n "$AWS_SECRET_ACCESS_KEY" ] && sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" noharm.env
-    [ -n "$GETNAME_SSL_URL" ] && sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" noharm.env
-    [ -n "$DB_TYPE" ] && sed -i "s|^DB_TYPE=.*|DB_TYPE=$DB_TYPE|" noharm.env
-    [ -n "$DB_HOST" ] && sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" noharm.env
-    [ -n "$DB_DATABASE" ] && sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" noharm.env
-    [ -n "$DB_PORT" ] && sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" noharm.env
-    [ -n "$DB_USER" ] && sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" noharm.env
-    [ -n "$DB_PASS" ] && sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" noharm.env
+    # Verificando se o arquivo noharm.env existe
+    if [ ! -f "nifi-composer/noharm.env" ]; then
+        echo "### Erro: Arquivo noharm.env não encontrado. Verifique a execução de update_secrets.sh."
+        exit 1
+    fi
+    
+    # Atualizando o arquivo noharm.env com as variáveis necessárias
+    sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" nifi-composer/noharm.env
+    sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" nifi-composer/noharm.env
+    sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" nifi-composer/noharm.env
+    sed -i "s|^DB_TYPE=.*|DB_TYPE=$DB_TYPE|" nifi-composer/noharm.env
+    sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" nifi-composer/noharm.env
+    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" nifi-composer/noharm.env
+    sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" nifi-composer/noharm.env
+    sed -i "s|^DB_USER=.*|DB_USER=$DB_USER|" nifi-composer/noharm.env
+    sed -i "s|^DB_PASS=.*|DB_PASS=$DB_PASS|" nifi-composer/noharm.env
 
     if [[ "$DB_QUERY" =~ \{\} ]]; then
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=\"$DB_QUERY\"|" noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=\"$DB_QUERY\"|" nifi-composer/noharm.env
     elif [ -n "$DB_QUERY" ]; then
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = $DB_QUERY|" nifi-composer/noharm.env
     else
-        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = {}|" noharm.env
+        sed -i "s|^DB_QUERY=.*|DB_QUERY=SELECT DISTINCT NOME FROM VW_PACIENTES WHERE FKPESSOA = {}|" nifi-composer/noharm.env
     fi
 
     if [[ "$DB_MULTI_QUERY" =~ \{\} ]]; then
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=\"$DB_MULTI_QUERY\"|" noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=\"$DB_MULTI_QUERY\"|" nifi-composer/noharm.env
     elif [ -n "$DB_MULTI_QUERY" ]; then
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ($DB_MULTI_QUERY)|" nifi-composer/noharm.env
     else
-        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" noharm.env
+        sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" nifi-composer/noharm.env
     fi
 
     echo "### Arquivo noharm.env atualizado com sucesso."
@@ -181,7 +202,7 @@ main() {
     # Verifica se REINSTALL_MODE está "true"
     if [[ "$REINSTALL_MODE" == "true" ]]; then
         echo "### Modo de reinstalação ativado. Excluindo pasta e reinstalando do zero..."
-        clone_repository_and_generate_password  # Sempre remove e clona novamente a pasta
+        remove_and_clone_repository  # Remove e clona novamente a pasta
         cleanup_containers  # Remove containers anteriores se necessário
         install_containers  # Inicia a instalação dos containers
     else
