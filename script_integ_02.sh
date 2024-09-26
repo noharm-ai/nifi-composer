@@ -210,6 +210,11 @@ main() {
         fi
     fi
 
+    # Executa o comando de geração de chaves
+    echo "### Executando comando de geração de chaves no container noharm-nifi..."
+    docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
+    check_status "Falha ao executar o comando de geração de chaves no container noharm-nifi"
+
     # Verificação e instalação do AWS CLI no noharm-nifi
     test_aws_cli_in_nifi
 
