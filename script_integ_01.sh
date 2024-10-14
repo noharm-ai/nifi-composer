@@ -52,6 +52,22 @@ get_memory_available() {
     echo "N/A"
 }
 
+ask_continue() {
+    local resource_name=$1
+    local min_value=$2
+    local actual_value=$3
+
+    echo "$resource_name insuficiente. Necessário pelo menos $min_value. Disponível: $actual_value."
+    echo "Por favor, tire um print desta tela e envie um e-mail ao cliente informando que os requisitos mínimos não foram atendidos."
+
+    read -p "Deseja continuar a instalação mesmo com $resource_name insuficiente? (y/n): " choice
+    case "$choice" in
+        y|Y ) echo "Continuando com a instalação...";;
+        n|N ) echo "Instalação interrompida devido a $resource_name insuficiente."; exit 1;;
+        * ) echo "Opção inválida. Instalação interrompida."; exit 1;;
+    esac
+}
+
 validate_requirements() {
     echo "Data Atual: $(date)"
     echo "Validando requisitos de sistema..."
@@ -80,31 +96,19 @@ validate_requirements() {
     echo "vCPUs disponíveis: ${VCPUS}"
 
     if [[ "$DISK_TOTAL" -lt 95 ]]; then
-        echo "Espaço total em disco insuficiente. Necessário pelo menos 95GB."
-        exit 1
+        ask_continue "Espaço total em disco" "95GB" "${DISK_TOTAL}GB"
     fi
 
     if [[ "$DISK_AVAILABLE" -lt 75 ]]; then
-        echo "Espaço disponível em disco insuficiente. Necessário pelo menos 75GB."
-        exit 1
+        ask_continue "Espaço disponível em disco" "75GB" "${DISK_AVAILABLE}GB"
     fi
 
     if [[ "$MEM_TOTAL" -lt 3500 ]]; then
-        echo "Memória total insuficiente. Necessário pelo menos 3.5GB."
-        echo "Por favor, tire um print desta tela e envie um e-mail ao cliente informando que os requisitos mínimos de memória não foram atendidos."
-        
-        # Pergunta se o usuário quer continuar a instalação mesmo com a memória insuficiente
-        read -p "Deseja continuar a instalação mesmo com a memória insuficiente? (y/n): " choice
-        case "$choice" in
-            y|Y ) echo "Continuando com a instalação...";;
-            n|N ) echo "Instalação interrompida devido à memória insuficiente."; exit 1;;
-            * ) echo "Opção inválida. Instalação interrompida."; exit 1;;
-        esac
+        ask_continue "Memória total" "3.5GB" "${MEM_TOTAL}MB"
     fi
 
     if [[ "$VCPUS" -lt 4 ]]; then
-        echo "vCPUs insuficientes. Necessário pelo menos 4 vCPUs."
-        exit 1
+        ask_continue "vCPUs" "4" "$VCPUS"
     fi
 
     echo "Requisitos de sistema validados com sucesso."
