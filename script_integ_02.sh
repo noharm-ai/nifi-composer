@@ -210,6 +210,10 @@ main() {
         fi
     fi
 
+    # Aguardar 1 minuto antes de executar o comando de geração de chaves
+    echo "### Aguardando 1 minuto para garantir que o container noharm-nifi esteja totalmente iniciado..."
+    sleep 60
+
     # Executa o comando de geração de chaves
     echo "### Executando comando de geração de chaves no container noharm-nifi..."
     docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
@@ -234,6 +238,10 @@ main() {
     else
         echo "### Erro: Arquivo noharm.env não encontrado para exibição."
     fi
+
+    # Executando o comando para exibir configurações de segurança no nifi.properties
+    echo "### Exibindo configurações de segurança do arquivo nifi.properties..."
+    docker exec --user="root" -it noharm-nifi /bin/bash -c "cat ./conf/nifi.properties | grep security && exit"
 }
 
 main "$@"
