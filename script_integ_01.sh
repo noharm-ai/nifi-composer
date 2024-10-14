@@ -25,35 +25,30 @@ rollback() {
 get_memory_available() {
     # Tenta capturar a memória disponível usando diferentes abordagens
 
-    # Primeira tentativa: usando o campo 'available' (sistemas modernos)
     MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
-    # Segunda tentativa: somando memória livre + buffers/cache (sistemas mais antigos)
     MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $4+$6}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
-    # Terceira tentativa: usando o campo 'free' diretamente (pode não ser preciso, mas uma estimativa)
     MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $4}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
-    # Quarta tentativa: pegando a coluna 'livre'
     MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $3}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
-    # Se todas as tentativas falharem, retorna "N/A" e segue com a execução
     echo "N/A"
 }
 
@@ -61,7 +56,6 @@ validate_requirements() {
     echo "Data Atual: $(date)"
     echo "Validando requisitos de sistema..."
 
-    # Exibe os valores gerais de espaço em disco e memória
     df -h
     df -h /var/lib/docker || echo "Docker não está instalado, pulando /var/lib/docker."
     free -m
@@ -73,7 +67,6 @@ validate_requirements() {
     MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
     VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
 
-    # Verifica se MEM_TOTAL_1 está vazio. Se estiver, usa MEM_TOTAL_2. Caso contrário, usa MEM_TOTAL_1.
     if [ -z "$MEM_TOTAL_1" ]; then
         MEM_TOTAL=$MEM_TOTAL_2
     else
@@ -98,7 +91,15 @@ validate_requirements() {
 
     if [[ "$MEM_TOTAL" -lt 3500 ]]; then
         echo "Memória total insuficiente. Necessário pelo menos 3.5GB."
-        exit 1
+        echo "Por favor, tire um print desta tela e envie um e-mail ao cliente informando que os requisitos mínimos de memória não foram atendidos."
+        
+        # Pergunta se o usuário quer continuar a instalação mesmo com a memória insuficiente
+        read -p "Deseja continuar a instalação mesmo com a memória insuficiente? (y/n): " choice
+        case "$choice" in
+            y|Y ) echo "Continuando com a instalação...";;
+            n|N ) echo "Instalação interrompida devido à memória insuficiente."; exit 1;;
+            * ) echo "Opção inválida. Instalação interrompida."; exit 1;;
+        esac
     fi
 
     if [[ "$VCPUS" -lt 4 ]]; then
@@ -144,10 +145,8 @@ install_docker_rpm_based() {
 configure_docker_non_root() {
     echo "Configurando Docker para ser executado como usuário não-root..."
     
-    # Mudança de proprietário do socket do Docker
     sudo chown $USER /var/run/docker.sock
 
-    # Verifica se o grupo "docker" já existe
     if getent group docker > /dev/null 2>&1; then
         echo "Grupo 'docker' já existe, continuando..."
     else
@@ -155,7 +154,6 @@ configure_docker_non_root() {
         echo "Grupo 'docker' criado com sucesso."
     fi
     
-    # Adiciona o usuário atual ao grupo "docker"
     sudo usermod -aG docker $USER
 
     echo "Configuração do Docker como usuário não-root concluída."
