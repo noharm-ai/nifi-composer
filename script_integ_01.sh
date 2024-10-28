@@ -25,93 +25,86 @@ rollback() {
 get_memory_available() {
     # Tenta capturar a memória disponível usando diferentes abordagens
 
+    # Primeira tentativa: usando o campo 'available' (sistemas modernos)
     MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $7}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
+    # Segunda tentativa: somando memória livre + buffers/cache (sistemas mais antigos)
     MEM_AVAILABLE=$(free -m | awk '/Mem:/ {print $4+$6}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
+    # Terceira tentativa: usando o campo 'free' diretamente (pode não ser preciso, mas uma estimativa)
     MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $4}')
     if [[ -n "$MEM_AVAILABLE" ]]; then
         echo "$MEM_AVAILABLE"
         return
     fi
 
-    MEM_AVAILABLE=$(free -m | awk '/^Mem:/{print $3}')
-    if [[ -n "$MEM_AVAILABLE" ]]; then
-        echo "$MEM_AVAILABLE"
-        return
-    fi
-
+    # Se todas as tentativas falharem, retorna "N/A" e segue com a execução
     echo "N/A"
 }
 
-ask_continue() {
-    local resource_name=$1
-    local min_value=$2
-    local actual_value=$3
-
-    echo "$resource_name insuficiente. Necessário pelo menos $min_value. Disponível: $actual_value."
-    echo "Por favor, tire um print desta tela e envie um e-mail ao cliente informando que os requisitos mínimos não foram atendidos."
-
-    read -p "Deseja continuar a instalação mesmo com $resource_name insuficiente? (y/n): " choice
-    case "$choice" in
-        y|Y ) echo "Continuando com a instalação...";;
-        n|N ) echo "Instalação interrompida devido a $resource_name insuficiente."; exit 1;;
-        * ) echo "Opção inválida. Instalação interrompida."; exit 1;;
-    esac
-}
-
-validate_requirements() {
-    echo "Data Atual: $(date)"
-    echo "Validando requisitos de sistema..."
-
-    df -h
-    df -h /var/lib/docker || echo "Docker não está instalado, pulando /var/lib/docker."
-    free -m
-
+validate_disk_requirements() {
     DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}' | tr -d 'G')  # Captura o espaço total em GB
     DISK_AVAILABLE=$(df -h / | awk 'NR==2 {print $4}' | tr -d 'G')  # Captura o espaço livre em GB
-    MEM_TOTAL_1=$(free -m | awk '/^Mem.:/{print $2}')  # Captura a memória total em MB
-    MEM_TOTAL_2=$(free -m | awk '/^Mem:/{print $2}')  # Captura a memória total em MB
-    MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
-    VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
-
-    if [ -z "$MEM_TOTAL_1" ]; then
-        MEM_TOTAL=$MEM_TOTAL_2
-    else
-        MEM_TOTAL=$MEM_TOTAL_1
-    fi
-
+    
     echo "Espaço total em disco: ${DISK_TOTAL}GB"
     echo "Espaço disponível em disco: ${DISK_AVAILABLE}GB"
-    echo "Memória total: ${MEM_TOTAL}MB"
-    echo "Memória disponível: ${MEM_AVAILABLE}MB"
-    echo "vCPUs disponíveis: ${VCPUS}"
 
     if [[ "$DISK_TOTAL" -lt 95 ]]; then
-        ask_continue "Espaço total em disco" "95GB" "${DISK_TOTAL}GB"
+        echo "Espaço total em disco insuficiente. Necessário pelo menos 95GB."
+        read -p "Deseja continuar mesmo assim? (y/n): " choice
+        if [[ "$choice" != "y" ]]; then
+            exit 1
+        fi
+        echo "Envie um e-mail para o cliente informando que os requisitos mínimos não foram atendidos."
     fi
 
     if [[ "$DISK_AVAILABLE" -lt 75 ]]; then
-        ask_continue "Espaço disponível em disco" "75GB" "${DISK_AVAILABLE}GB"
+        echo "Espaço disponível em disco insuficiente. Necessário pelo menos 75GB."
+        read -p "Deseja continuar mesmo assim? (y/n): " choice
+        if [[ "$choice" != "y" ]]; then
+            exit 1
+        fi
+        echo "Envie um e-mail para o cliente informando que os requisitos mínimos não foram atendidos."
     fi
+}
+
+validate_memory_requirements() {
+    MEM_TOTAL=$(free -m | awk '/^Mem:/{print $2}')  # Captura a memória total em MB
+    MEM_AVAILABLE=$(get_memory_available)  # Captura a memória disponível em MB
+    
+    echo "Memória total: ${MEM_TOTAL}MB"
+    echo "Memória disponível: ${MEM_AVAILABLE}MB"
 
     if [[ "$MEM_TOTAL" -lt 3500 ]]; then
-        ask_continue "Memória total" "3.5GB" "${MEM_TOTAL}MB"
+        echo "Memória total insuficiente. Necessário pelo menos 3.5GB."
+        read -p "Deseja continuar mesmo assim? (y/n): " choice
+        if [[ "$choice" != "y" ]]; then
+            exit 1
+        fi
+        echo "Envie um e-mail para o cliente informando que os requisitos mínimos não foram atendidos."
     fi
+}
+
+validate_cpu_requirements() {
+    VCPUS=$(nproc)  # Captura o número de vCPUs disponíveis
+    echo "vCPUs disponíveis: ${VCPUS}"
 
     if [[ "$VCPUS" -lt 4 ]]; then
-        ask_continue "vCPUs" "4" "$VCPUS"
+        echo "vCPUs insuficientes. Necessário pelo menos 4 vCPUs."
+        read -p "Deseja continuar mesmo assim? (y/n): " choice
+        if [[ "$choice" != "y" ]]; then
+            exit 1
+        fi
+        echo "Envie um e-mail para o cliente informando que os requisitos mínimos não foram atendidos."
     fi
-
-    echo "Requisitos de sistema validados com sucesso."
 }
 
 install_docker_ubuntu_debian() {
@@ -149,8 +142,10 @@ install_docker_rpm_based() {
 configure_docker_non_root() {
     echo "Configurando Docker para ser executado como usuário não-root..."
     
+    # Mudança de proprietário do socket do Docker
     sudo chown $USER /var/run/docker.sock
 
+    # Verifica se o grupo "docker" já existe
     if getent group docker > /dev/null 2>&1; then
         echo "Grupo 'docker' já existe, continuando..."
     else
@@ -158,6 +153,7 @@ configure_docker_non_root() {
         echo "Grupo 'docker' criado com sucesso."
     fi
     
+    # Adiciona o usuário atual ao grupo "docker"
     sudo usermod -aG docker $USER
 
     echo "Configuração do Docker como usuário não-root concluída."
@@ -165,7 +161,22 @@ configure_docker_non_root() {
 }
 
 main() {
-    validate_requirements
+    echo "Data Atual: $(date)"
+    echo "Validando requisitos de sistema..."
+
+    # Exibe os valores gerais de espaço em disco e memória
+    df -h
+    df -h /var/lib/docker || echo "Docker não está instalado, pulando /var/lib/docker."
+    free -m
+
+    # Validação de disco
+    validate_disk_requirements
+
+    # Validação de memória
+    validate_memory_requirements
+
+    # Validação de CPU
+    validate_cpu_requirements
 
     if [[ -f /etc/debian_version ]]; then
         install_docker_ubuntu_debian
