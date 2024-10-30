@@ -170,6 +170,18 @@ install_containers() {
     retry_docker_pull
 }
 
+# Function to modify the renew_cert.sh script inside nifi-getname container
+modify_renew_cert_script() {
+    echo "### Modificando o arquivo renew_cert.sh para usar a variável de ambiente GETNAME_SSL_URL..."
+    container_name="nifi-getname"
+    
+    # Replace line in the renew_cert.sh script
+    docker exec --user="root" -it "$container_name" sed -i 's|SSL_URL=.*|SSL_URL=${GETNAME_SSL_URL}|' /path/to/app/renew_cert.sh
+    check_status "Falha ao modificar o script renew_cert.sh no container $container_name"
+
+    echo "### Modificação do renew_cert.sh concluída com sucesso."
+}
+
 # Função principal que controla a execução do script
 main() {
     if [ "$#" -lt 15 ]; then
@@ -218,6 +230,14 @@ main() {
     echo "### Executando comando de geração de chaves no container noharm-nifi..."
     docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
     check_status "Falha ao executar o comando de geração de chaves no container noharm-nifi"
+
+    # Modify renew_cert.sh after the containers are up
+    modify_renew_cert_script
+
+    # Reiniciando o container noharm-getname após modificar ssl_url
+    echo "### Reiniciando o serviço noharm-getname para aplicar as modificações do ssl..."
+    docker restart noharm-getname
+    check_status "Falha ao reiniciar o container noharm-getname"
 
     # Verificação e instalação do AWS CLI no noharm-nifi
     test_aws_cli_in_nifi
