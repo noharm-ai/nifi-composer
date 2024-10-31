@@ -183,7 +183,7 @@ modify_renew_cert_script() {
     fi
     
     # Replace line in the renew_cert.sh script
-    docker exec --user="root" -it "$container_name" sed -i 's|SSL_URL=.*|SSL_URL=${GETNAME_SSL_URL}|' /path/to/app/renew_cert.sh
+    docker exec --user="root" -it "$container_name" sed -i "s|SSL_URL=.*|SSL_URL=${GETNAME_SSL_URL}|" /app/renew_cert.sh
     check_status "Falha ao modificar o script renew_cert.sh no container $container_name"
 
     echo "### Modificação do renew_cert.sh concluída com sucesso."
