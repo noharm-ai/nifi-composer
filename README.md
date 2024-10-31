@@ -42,7 +42,7 @@ docker logs noharm-nifi --tail 500 | grep "JettyServer NiFi has started"
 ```
 docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
 docker exec --user="root" -t noharm-nifi apt update
-docker exec --user="root" -t noharm-nifi apt install nano vim awscli -y
+docker exec --user="root" -t noharm-nifi apt install nano vim awscli wget -y
 docker restart noharm-nifi
 ```
 ### 4.1 Validation
