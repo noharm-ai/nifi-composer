@@ -173,7 +173,14 @@ install_containers() {
 # Function to modify the renew_cert.sh script inside nifi-getname container
 modify_renew_cert_script() {
     echo "### Modificando o arquivo renew_cert.sh para usar a variável de ambiente GETNAME_SSL_URL..."
-    container_name="nifi-getname"
+    # Captura o nome completo do container que contém "getname"
+    container_name=$(docker ps --format "{{.Names}}" | grep "getname")
+    
+    # Verifica se o container foi encontrado
+    if [ -z "$container_name" ]; then
+        echo "### Erro: Nenhum container com 'getname' no nome foi encontrado."
+        exit 1
+    fi
     
     # Replace line in the renew_cert.sh script
     docker exec --user="root" -it "$container_name" sed -i 's|SSL_URL=.*|SSL_URL=${GETNAME_SSL_URL}|' /path/to/app/renew_cert.sh
