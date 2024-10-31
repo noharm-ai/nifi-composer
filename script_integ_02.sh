@@ -96,7 +96,7 @@ install_aws_cli_in_nifi() {
     container_name="noharm-nifi"
     echo "### Instalando AWS CLI no container $container_name..."
     docker exec --user="root" -it "$container_name" apt update
-    docker exec --user="root" -it "$container_name" apt install awscli -y
+    docker exec --user="root" -it "$container_name" apt install awscli wget -y
     check_status "Falha ao instalar AWS CLI no container $container_name"
 }
 
