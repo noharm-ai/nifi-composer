@@ -64,7 +64,7 @@ echo "Dentro do contêiner $SERVICO_NIFI..."
 LOCAL_CONF_DIR="/conf"
 
 # Caminho remoto no S3
-S3_CONF_DIR="${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf"
+S3_CONF_DIR="$S3_BUCKET_PATH/$NOME_DO_CLIENTE/conf"
 
 # Verificar se a pasta conf existe
 if [ -d "\$LOCAL_CONF_DIR" ]; then
