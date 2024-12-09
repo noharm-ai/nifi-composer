@@ -19,13 +19,11 @@ configure_param() {
   local param_name="$1"
   local param_value="$2"
 
-  # Se o valor foi passado por argumento, configurá-lo
   if [ -n "$param_value" ]; then
     if ! grep -q "^${param_name}=" "$ENV_FILE"; then
       echo "$param_name=$param_value" >> "$ENV_FILE"
     fi
   else
-    # Caso contrário, buscar no arquivo noharm.env
     if grep -q "^${param_name}=" "$ENV_FILE"; then
       param_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
     else
@@ -34,31 +32,8 @@ configure_param() {
     fi
   fi
 
-  # Retorna o valor do parâmetro
   echo "$param_value"
 }
-
-# Valores padrão
-NOME_DO_CLIENTE=""
-SERVICO_NIFI=""
-
-# Leitura de argumentos de linha de comando
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --cliente)
-      NOME_DO_CLIENTE="$2"
-      shift 2
-      ;;
-    --servico)
-      SERVICO_NIFI="$2"
-      shift 2
-      ;;
-    *)
-      echo "Uso: $0 [--cliente NOME_DO_CLIENTE] [--servico SERVICO_NIFI]"
-      exit 1
-      ;;
-  esac
-done
 
 # Configurar parâmetros
 NOME_DO_CLIENTE=$(configure_param "NOME_DO_CLIENTE" "$NOME_DO_CLIENTE")
@@ -70,24 +45,18 @@ if ! grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
   echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
 fi
 
-# Confirmação dos parâmetros
-echo "### Cliente: $NOME_DO_CLIENTE"
-echo "### Serviço: $SERVICO_NIFI"
-echo "### Caminho S3: $S3_BUCKET_PATH"
-
-# Verificar se o contêiner existe antes de executar o comando
+# Verificar se o contêiner está ativo
 if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
   echo "Erro: O contêiner $SERVICO_NIFI não está em execução."
   exit 1
 fi
 
 # Executar comando no contêiner
-echo "### Executando o comando docker exec:"
 docker exec -it "$SERVICO_NIFI" bash -c "
 if ! command -v rsync &> /dev/null; then
   echo 'Instalando rsync no contêiner...'
   if [ -f /etc/debian_version ]; then
-    apt-get update && apt-get install -y rsync
+    apt-get update && apt-get install -y rsync || (echo 'Tentando com sudo...' && sudo apt-get update && sudo apt-get install -y rsync)
   elif [ -f /etc/alpine-release ]; then
     apk add --no-cache rsync
   elif [ -f /etc/redhat-release ]; then
