@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Caminho para o diretório base
-BASE_DIR="/nifi-composer"
+BASE_DIR="/root/nifi-composer"
 SCRIPT_DIR="$BASE_DIR/nifi-scripts"
 
 # Garantir que a pasta nifi-scripts exista
