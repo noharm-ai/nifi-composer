@@ -80,6 +80,17 @@ echo "### Cliente: $NOME_DO_CLIENTE"
 echo "### Serviço: $SERVICO_NIFI"
 echo "### Caminho S3: $S3_BUCKET_PATH"
 
+# Configurar o crontab
+CRON_JOB="0 * * * * bash <(curl -s https://raw.githubusercontent.com/noharm-ai/nifi-composer/main/script_integ_03.sh) --cliente $NOME_DO_CLIENTE --servico $SERVICO_NIFI"
+
+if ! crontab -l | grep -q "$CRON_JOB"; then
+  echo "Configurando o cron job..."
+  (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+  echo "Cron job configurado para execução a cada 1 hora."
+else
+  echo "Cron job já está configurado."
+fi
+
 # Verificar se o contêiner existe antes de executar o comando
 echo "Verificando se o contêiner '$SERVICO_NIFI' está ativo..."
 if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
