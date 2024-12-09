@@ -19,13 +19,11 @@ configure_param() {
   local param_name="$1"
   local param_value="$2"
 
-  # Se o valor foi passado por argumento, configurá-lo
   if [ -n "$param_value" ]; then
     if ! grep -q "^${param_name}=" "$ENV_FILE"; then
       echo "$param_name=$param_value" >> "$ENV_FILE"
     fi
   else
-    # Caso contrário, buscar no arquivo noharm.env
     if grep -q "^${param_name}=" "$ENV_FILE"; then
       param_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
     else
@@ -34,7 +32,6 @@ configure_param() {
     fi
   fi
 
-  # Retorna o valor do parâmetro
   echo "$param_value"
 }
 
@@ -76,13 +73,19 @@ echo "### Serviço: $SERVICO_NIFI"
 echo "### Caminho S3: $S3_BUCKET_PATH"
 
 # Verificar se o contêiner existe antes de executar o comando
+echo "Verificando se o contêiner '$SERVICO_NIFI' está ativo..."
 if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
   echo "Erro: O contêiner $SERVICO_NIFI não está em execução."
+  echo "Contêineres ativos no momento:"
+  docker ps --format '{{.Names}}'
   exit 1
 fi
 
+# Exibir o comando que será executado
+echo "Comando a ser executado:"
+echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
+
 # Executar comando no contêiner
-echo "### Executando o comando docker exec:"
 docker exec -it "$SERVICO_NIFI" bash -c "
 if ! command -v rsync &> /dev/null; then
   echo 'Instalando rsync no contêiner...'
