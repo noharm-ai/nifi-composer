@@ -14,20 +14,22 @@ fi
 # Caminho para o arquivo noharm.env
 ENV_FILE="$BASE_DIR/noharm.env"
 
-# Função para verificar ou solicitar parâmetros
-verify_or_request_param() {
+# Função para verificar ou configurar parâmetros
+configure_param() {
   local param_name="$1"
-  local param_prompt="$2"
+  local param_value="$2"
 
-  # Verifica se o parâmetro já existe no arquivo noharm.env
-  if ! grep -q "^${param_name}=" "$ENV_FILE"; then
-    read -p "$param_prompt: " param_value
-    echo "${param_name}=${param_value}" >> "$ENV_FILE"
+  # Se o valor foi passado por argumento, configurá-lo
+  if [ -n "$param_value" ]; then
+    echo "$param_name=$param_value" >> "$ENV_FILE"
+    echo "$param_name configurado com o valor: $param_value"
   else
-    param_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
-    if [ -z "$param_value" ]; then
-      read -p "$param_prompt (atualmente vazio): " param_value
-      sed -i "s/^${param_name}=.*/${param_name}=${param_value}/" "$ENV_FILE"
+    # Caso contrário, buscar no arquivo noharm.env
+    if grep -q "^${param_name}=" "$ENV_FILE"; then
+      param_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
+    else
+      echo "Erro: $param_name não foi passado e não está configurado no $ENV_FILE."
+      exit 1
     fi
   fi
 
@@ -35,19 +37,41 @@ verify_or_request_param() {
   echo "$param_value"
 }
 
-# Solicitar ou usar parâmetros
-NOME_DO_CLIENTE=$(verify_or_request_param "NOME_DO_CLIENTE" "Informe o nome do cliente")
-SERVICO_NIFI=$(verify_or_request_param "SERVICO_NIFI" "Informe o nome do serviço do NiFi")
+# Valores padrão
+NOME_DO_CLIENTE=""
+SERVICO_NIFI=""
+
+# Leitura de argumentos de linha de comando
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --cliente)
+      NOME_DO_CLIENTE="$2"
+      shift 2
+      ;;
+    --servico)
+      SERVICO_NIFI="$2"
+      shift 2
+      ;;
+    *)
+      echo "Uso: $0 [--cliente NOME_DO_CLIENTE] [--servico SERVICO_NIFI]"
+      exit 1
+      ;;
+  esac
+done
+
+# Configurar parâmetros
+NOME_DO_CLIENTE=$(configure_param "NOME_DO_CLIENTE" "$NOME_DO_CLIENTE")
+SERVICO_NIFI=$(configure_param "SERVICO_NIFI" "$SERVICO_NIFI")
 
 # Configurar S3_BUCKET_PATH fixo
 S3_BUCKET_PATH="https://sa-east-1.console.aws.amazon.com/s3/buckets/noharm-nifi?region=sa-east-1&bucketType=general&tab=objects"
 echo "S3_BUCKET_PATH está fixado como: $S3_BUCKET_PATH"
 
 # Atualizar o valor no arquivo noharm.env
-if ! grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
-  echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
-else
+if grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
   sed -i "s|^S3_BUCKET_PATH=.*|S3_BUCKET_PATH=$S3_BUCKET_PATH|" "$ENV_FILE"
+else
+  echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
 fi
 
 # Confirmação dos parâmetros
@@ -64,7 +88,7 @@ echo "Dentro do contêiner $SERVICO_NIFI..."
 LOCAL_CONF_DIR="/conf"
 
 # Caminho remoto no S3
-S3_CONF_DIR="$S3_BUCKET_PATH/$NOME_DO_CLIENTE/conf"
+S3_CONF_DIR="${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf"
 
 # Verificar se a pasta conf existe
 if [ -d "\$LOCAL_CONF_DIR" ]; then
