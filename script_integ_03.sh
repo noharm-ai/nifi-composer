@@ -88,13 +88,13 @@ echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 # Executar comando no contêiner
 docker exec -it "$SERVICO_NIFI" bash -c "
 if ! command -v rsync &> /dev/null; then
-  echo 'Instalando rsync no contêiner...'
+  echo 'rsync não encontrado. Instalando com sudo...'
   if [ -f /etc/debian_version ]; then
-    apt-get update && apt-get install -y rsync
+    sudo apt-get update && sudo apt-get install -y rsync || { echo 'Falha ao instalar rsync com sudo. Tentando sem sudo...'; apt-get update && apt-get install -y rsync; }
   elif [ -f /etc/alpine-release ]; then
-    apk add --no-cache rsync
+    sudo apk add --no-cache rsync || apk add --no-cache rsync
   elif [ -f /etc/redhat-release ]; then
-    yum install -y rsync
+    sudo yum install -y rsync || yum install -y rsync
   else
     echo 'Distribuição desconhecida. Não foi possível instalar o rsync.'
     exit 1
