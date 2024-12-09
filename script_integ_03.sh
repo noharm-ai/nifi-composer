@@ -6,7 +6,7 @@ SCRIPT_DIR="$BASE_DIR/nifi-scripts"
 
 # Garantir que a pasta nifi-scripts exista
 if [ ! -d "$SCRIPT_DIR" ]; then
-  echo "Criando o diretório $SCRIPT_DIR..."
+  echo "### Criando o diretório $SCRIPT_DIR..."
   mkdir -p "$SCRIPT_DIR"
   chmod 755 "$SCRIPT_DIR"
 fi
@@ -65,29 +65,32 @@ SERVICO_NIFI=$(configure_param "SERVICO_NIFI" "$SERVICO_NIFI")
 
 # Configurar S3_BUCKET_PATH fixo
 S3_BUCKET_PATH="https://sa-east-1.console.aws.amazon.com/s3/buckets/noharm-nifi?region=sa-east-1&bucketType=general&tab=objects"
-echo "S3_BUCKET_PATH está fixado como: $S3_BUCKET_PATH"
 
 # Atualizar o valor no arquivo noharm.env
 if grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
   sed -i "s|^S3_BUCKET_PATH=.*|S3_BUCKET_PATH=$S3_BUCKET_PATH|" "$ENV_FILE"
 else
-  echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
+  echo "### S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
 fi
 
 # Confirmação dos parâmetros
-echo "Cliente: $NOME_DO_CLIENTE"
-echo "Serviço: $SERVICO_NIFI"
-echo "Caminho S3: $S3_BUCKET_PATH"
+echo "### Cliente: $NOME_DO_CLIENTE"
+echo "### Serviço: $SERVICO_NIFI"
+echo "### Caminho S3: $S3_BUCKET_PATH"
 
 # Log do comando docker exec
-echo "Executando o comando docker exec:"
-echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
+echo "### Executando o comando docker exec:"
+echo "### docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 
 # Verificar se o contêiner existe antes de executar o comando
 if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
-  echo "Erro: O contêiner $SERVICO_NIFI não está em execução."
+  echo "### Erro: O contêiner $SERVICO_NIFI não está em execução."
   exit 1
 fi
+
+echo "### Comando Docker executado:"
+echo "### docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
+
 
 # Conexão ao contêiner Docker e sincronização
 docker exec -it "$SERVICO_NIFI" bash -c "
