@@ -82,8 +82,24 @@ echo "Caminho S3: $S3_BUCKET_PATH"
 # Conexão ao contêiner Docker e sincronização
 echo "Conectando ao contêiner Docker: $SERVICO_NIFI"
 
-# Use valores diretamente no docker exec para evitar substituições incorretas
+# Instalação do rsync caso não esteja instalado no contêiner
 docker exec -it "$SERVICO_NIFI" bash -c "
+if ! command -v rsync &> /dev/null; then
+  echo 'Instalando rsync no contêiner...'
+  if [ -f /etc/debian_version ]; then
+    apt-get update && apt-get install -y rsync
+  elif [ -f /etc/alpine-release ]; then
+    apk add --no-cache rsync
+  elif [ -f /etc/redhat-release ]; then
+    yum install -y rsync
+  else
+    echo 'Distribuição desconhecida. Não foi possível instalar o rsync.'
+    exit 1
+  fi
+else
+  echo 'rsync já está instalado no contêiner.'
+fi
+
 LOCAL_CONF_DIR='/conf'
 S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf'
 
