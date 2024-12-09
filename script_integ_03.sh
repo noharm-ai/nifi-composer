@@ -35,42 +35,25 @@ configure_param() {
   echo "$param_value"
 }
 
-# Valores padrão
-NOME_DO_CLIENTE=""
-SERVICO_NIFI=""
-
-# Leitura de argumentos de linha de comando
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --cliente)
-      NOME_DO_CLIENTE="$2"
-      shift 2
-      ;;
-    --servico)
-      SERVICO_NIFI="$2"
-      shift 2
-      ;;
-    *)
-      echo "Uso: $0 [--cliente NOME_DO_CLIENTE] [--servico SERVICO_NIFI]"
-      exit 1
-      ;;
-  esac
-done
-
 # Configurar parâmetros
 NOME_DO_CLIENTE=$(configure_param "NOME_DO_CLIENTE" "$NOME_DO_CLIENTE")
 SERVICO_NIFI=$(configure_param "SERVICO_NIFI" "$SERVICO_NIFI")
 
 # Configurar S3_BUCKET_PATH fixo
-S3_BUCKET_PATH="https://sa-east-1.console.aws.amazon.com/s3/buckets/noharm-nifi?region=sa-east-1&bucketType=general&tab=objects"
+S3_BUCKET_PATH="s3://noharm-nifi"
 if ! grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
   echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
 fi
 
-# Confirmação dos parâmetros
-echo "### Cliente: $NOME_DO_CLIENTE"
-echo "### Serviço: $SERVICO_NIFI"
-echo "### Caminho S3: $S3_BUCKET_PATH"
+# Configurar credenciais AWS
+export AWS_ACCESS_KEY_ID=$(grep "^AWS_ACCESS_KEY_ID=" "$ENV_FILE" | cut -d'=' -f2-)
+export AWS_SECRET_ACCESS_KEY=$(grep "^AWS_SECRET_ACCESS_KEY=" "$ENV_FILE" | cut -d'=' -f2-)
+export AWS_DEFAULT_REGION=$(grep "^AWS_DEFAULT_REGION=" "$ENV_FILE" | cut -d'=' -f2-)
+
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_DEFAULT_REGION" ]; then
+  echo "Erro: Credenciais AWS não configuradas no arquivo $ENV_FILE."
+  exit 1
+fi
 
 # Verificar se o contêiner existe antes de executar o comando
 echo "Verificando se o contêiner '$SERVICO_NIFI' está ativo..."
@@ -87,31 +70,17 @@ echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 
 # Executar comando no contêiner
 docker exec -it "$SERVICO_NIFI" bash -c "
-if ! command -v rsync &> /dev/null; then
-  echo 'rsync não encontrado. Instalando com sudo...'
-  if [ -f /etc/debian_version ]; then
-    sudo apt-get update && sudo apt-get install -y rsync || { echo 'Falha ao instalar rsync com sudo. Tentando sem sudo...'; apt-get update && apt-get install -y rsync; }
-  elif [ -f /etc/alpine-release ]; then
-    sudo apk add --no-cache rsync || apk add --no-cache rsync
-  elif [ -f /etc/redhat-release ]; then
-    sudo yum install -y rsync || yum install -y rsync
-  else
-    echo 'Distribuição desconhecida. Não foi possível instalar o rsync.'
-    exit 1
-  fi
-else
-  echo 'rsync já está instalado no contêiner.'
-fi
-
 LOCAL_CONF_DIR='/opt/nifi/nifi-current/conf'
 S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf'
 
 echo 'Dentro do contêiner $SERVICO_NIFI...'
 
 if [ -d \"\$LOCAL_CONF_DIR\" ]; then
-  echo 'Sincronizando arquivos...'
-  rsync -avz --include=\"*.json.gz\" --include=\"*.xml.gz\" --exclude=\"*\" \
-    \"\$LOCAL_CONF_DIR/\" \"\$S3_CONF_DIR/\"
+  echo 'Sincronizando arquivos com AWS CLI...'
+  
+  # Enviar arquivos para o S3
+  aws s3 cp \"\$LOCAL_CONF_DIR\" \"\$S3_CONF_DIR\" --recursive --exclude \"*\" --include \"*.json.gz\" --include \"*.xml.gz\"
+  
   echo 'Sincronização concluída.'
 else
   echo 'Pasta conf não encontrada dentro do contêiner.'
