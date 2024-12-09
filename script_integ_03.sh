@@ -79,10 +79,17 @@ echo "Cliente: $NOME_DO_CLIENTE"
 echo "Serviço: $SERVICO_NIFI"
 echo "Caminho S3: $S3_BUCKET_PATH"
 
-# Conexão ao contêiner Docker e sincronização
-echo "Conectando ao contêiner Docker: $SERVICO_NIFI"
+# Log do comando docker exec
+echo "Executando o comando docker exec:"
+echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 
-# Instalação do rsync caso não esteja instalado no contêiner
+# Verificar se o contêiner existe antes de executar o comando
+if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
+  echo "Erro: O contêiner $SERVICO_NIFI não está em execução."
+  exit 1
+fi
+
+# Conexão ao contêiner Docker e sincronização
 docker exec -it "$SERVICO_NIFI" bash -c "
 if ! command -v rsync &> /dev/null; then
   echo 'Instalando rsync no contêiner...'
@@ -108,11 +115,4 @@ echo 'Dentro do contêiner $SERVICO_NIFI...'
 if [ -d \"\$LOCAL_CONF_DIR\" ]; then
   echo 'Sincronizando arquivos...'
 
-  rsync -avz --include=\"*.json.gz\" --include=\"*.xml.gz\" --exclude=\"*\" \
-    \"\$LOCAL_CONF_DIR/\" \"\$S3_CONF_DIR/\"
-
-  echo 'Sincronização concluída.'
-else
-  echo 'Pasta conf não encontrada dentro do contêiner.'
-fi
-"
+  rsync -avz
