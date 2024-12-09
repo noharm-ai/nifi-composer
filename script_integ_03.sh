@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Caminho para o arquivo noharm.env
-ENV_FILE="/nifi-composer/noharm.env"
+ENV_FILE="/root/nifi-composer/noharm.env"
 
 # Função para verificar ou atualizar o parâmetro no arquivo noharm.env
 update_or_get_param() {
