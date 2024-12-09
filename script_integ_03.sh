@@ -23,13 +23,11 @@ verify_or_request_param() {
   if ! grep -q "^${param_name}=" "$ENV_FILE"; then
     read -p "$param_prompt: " param_value
     echo "${param_name}=${param_value}" >> "$ENV_FILE"
-    echo "$param_name configurado com o valor: $param_value"
   else
     param_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
     if [ -z "$param_value" ]; then
       read -p "$param_prompt (atualmente vazio): " param_value
       sed -i "s/^${param_name}=.*/${param_name}=${param_value}/" "$ENV_FILE"
-      echo "$param_name atualizado com o valor: $param_value"
     fi
   fi
 
@@ -40,7 +38,17 @@ verify_or_request_param() {
 # Solicitar ou usar parâmetros
 NOME_DO_CLIENTE=$(verify_or_request_param "NOME_DO_CLIENTE" "Informe o nome do cliente")
 SERVICO_NIFI=$(verify_or_request_param "SERVICO_NIFI" "Informe o nome do serviço do NiFi")
-S3_BUCKET_PATH=$(verify_or_request_param "S3_BUCKET_PATH" "Informe o caminho do S3 (ex.: s3://noharm-nifi)")
+
+# Configurar S3_BUCKET_PATH fixo
+S3_BUCKET_PATH="https://sa-east-1.console.aws.amazon.com/s3/buckets/noharm-nifi?region=sa-east-1&bucketType=general&tab=objects"
+echo "S3_BUCKET_PATH está fixado como: $S3_BUCKET_PATH"
+
+# Atualizar o valor no arquivo noharm.env
+if ! grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
+  echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
+else
+  sed -i "s|^S3_BUCKET_PATH=.*|S3_BUCKET_PATH=$S3_BUCKET_PATH|" "$ENV_FILE"
+fi
 
 # Confirmação dos parâmetros
 echo "Cliente: $NOME_DO_CLIENTE"
