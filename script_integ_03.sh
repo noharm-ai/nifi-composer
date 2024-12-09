@@ -1,7 +1,18 @@
 #!/bin/bash
 
+# Caminho para o diretório base
+BASE_DIR="/nifi-composer"
+SCRIPT_DIR="$BASE_DIR/nifi-scripts"
+
+# Garantir que a pasta nifi-scripts exista
+if [ ! -d "$SCRIPT_DIR" ]; then
+  echo "Criando o diretório $SCRIPT_DIR..."
+  mkdir -p "$SCRIPT_DIR"
+  chmod 755 "$SCRIPT_DIR"
+fi
+
 # Caminho para o arquivo noharm.env
-ENV_FILE="/nifi-composer/noharm.env"
+ENV_FILE="$BASE_DIR/noharm.env"
 
 # Função para verificar ou solicitar parâmetros
 verify_or_request_param() {
