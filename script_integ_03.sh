@@ -51,10 +51,14 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
   exit 1
 fi
 
+# Exibir o comando gerado
+echo "Comando a ser executado:"
+echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
+
 # Executar comando no contêiner
 docker exec -it "$SERVICO_NIFI" bash -c "
 if ! command -v rsync &> /dev/null; then
-  echo 'Instalando rsync no contêiner com sudo...'
+  echo 'Instalando rsync no contêiner...'
   if [ -f /etc/debian_version ]; then
     sudo apt-get update && sudo apt-get install -y rsync
   elif [ -f /etc/alpine-release ]; then
@@ -69,7 +73,7 @@ else
   echo 'rsync já está instalado no contêiner.'
 fi
 
-LOCAL_CONF_DIR='/conf'
+LOCAL_CONF_DIR='/opt/nifi/nifi-current/conf'
 S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf'
 
 echo 'Dentro do contêiner $SERVICO_NIFI...'
@@ -80,6 +84,6 @@ if [ -d \"\$LOCAL_CONF_DIR\" ]; then
     \"\$LOCAL_CONF_DIR/\" \"\$S3_CONF_DIR/\"
   echo 'Sincronização concluída.'
 else
-  echo 'Pasta conf não encontrada dentro do contêiner.'
+  echo 'Pasta conf não encontrada no contêiner.'
 fi
 "
