@@ -54,13 +54,13 @@ fi
 # Executar comando no contêiner
 docker exec -it "$SERVICO_NIFI" bash -c "
 if ! command -v rsync &> /dev/null; then
-  echo 'Instalando rsync no contêiner...'
+  echo 'Instalando rsync no contêiner com sudo...'
   if [ -f /etc/debian_version ]; then
-    apt-get update && apt-get install -y rsync || (echo 'Tentando com sudo...' && sudo apt-get update && sudo apt-get install -y rsync)
+    sudo apt-get update && sudo apt-get install -y rsync
   elif [ -f /etc/alpine-release ]; then
-    apk add --no-cache rsync
+    sudo apk add --no-cache rsync
   elif [ -f /etc/redhat-release ]; then
-    yum install -y rsync
+    sudo yum install -y rsync
   else
     echo 'Distribuição desconhecida. Não foi possível instalar o rsync.'
     exit 1
@@ -76,7 +76,7 @@ echo 'Dentro do contêiner $SERVICO_NIFI...'
 
 if [ -d \"\$LOCAL_CONF_DIR\" ]; then
   echo 'Sincronizando arquivos...'
-  rsync -avz --include=\"*.json.gz\" --include=\"*.xml.gz\" --exclude=\"*\" \
+  sudo rsync -avz --include=\"*.json.gz\" --include=\"*.xml.gz\" --exclude=\"*\" \
     \"\$LOCAL_CONF_DIR/\" \"\$S3_CONF_DIR/\"
   echo 'Sincronização concluída.'
 else
