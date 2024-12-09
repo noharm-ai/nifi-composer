@@ -79,7 +79,7 @@ echo "### Caminho S3: $S3_BUCKET_PATH"
 
 # Log do comando docker exec
 echo "### Executando o comando docker exec:"
-echo "### docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
+echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 
 # Verificar se o contêiner existe antes de executar o comando
 if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
