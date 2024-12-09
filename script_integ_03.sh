@@ -1,51 +1,35 @@
 #!/bin/bash
 
 # Caminho para o arquivo noharm.env
-ENV_FILE="/root/nifi-composer/noharm.env"
+ENV_FILE="/nifi-composer/noharm.env"
 
-# Função para verificar ou atualizar o parâmetro no arquivo noharm.env
-update_or_get_param() {
+# Função para verificar ou solicitar parâmetros
+verify_or_request_param() {
   local param_name="$1"
-  local param_value="$2"
+  local param_prompt="$2"
 
-  # Verifica se o parâmetro já existe no arquivo
-  if grep -q "^${param_name}=" "$ENV_FILE"; then
-    current_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
-    if [ -z "$current_value" ]; then
+  # Verifica se o parâmetro já existe no arquivo noharm.env
+  if ! grep -q "^${param_name}=" "$ENV_FILE"; then
+    read -p "$param_prompt: " param_value
+    echo "${param_name}=${param_value}" >> "$ENV_FILE"
+    echo "$param_name configurado com o valor: $param_value"
+  else
+    param_value=$(grep "^${param_name}=" "$ENV_FILE" | cut -d'=' -f2-)
+    if [ -z "$param_value" ]; then
+      read -p "$param_prompt (atualmente vazio): " param_value
       sed -i "s/^${param_name}=.*/${param_name}=${param_value}/" "$ENV_FILE"
       echo "$param_name atualizado com o valor: $param_value"
-    else
-      echo "$current_value"
     fi
-  else
-    echo "${param_name}=${param_value}" >> "$ENV_FILE"
-    echo "$param_name adicionado ao arquivo com o valor: $param_value"
   fi
+
+  # Retorna o valor do parâmetro
+  echo "$param_value"
 }
 
-# Solicita ou utiliza o nome do cliente
-if ! grep -q "^NOME_DO_CLIENTE=" "$ENV_FILE"; then
-  read -p "Informe o nome do cliente: " NOME_DO_CLIENTE
-  echo "NOME_DO_CLIENTE=${NOME_DO_CLIENTE}" >> "$ENV_FILE"
-else
-  NOME_DO_CLIENTE=$(grep "^NOME_DO_CLIENTE=" "$ENV_FILE" | cut -d'=' -f2-)
-fi
-
-# Solicita ou utiliza o nome do serviço
-if ! grep -q "^SERVICO_NIFI=" "$ENV_FILE"; then
-  read -p "Informe o nome do serviço do NiFi: " SERVICO_NIFI
-  echo "SERVICO_NIFI=${SERVICO_NIFI}" >> "$ENV_FILE"
-else
-  SERVICO_NIFI=$(grep "^SERVICO_NIFI=" "$ENV_FILE" | cut -d'=' -f2-)
-fi
-
-# Solicita ou utiliza o caminho do S3
-if ! grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
-  read -p "Informe o caminho do S3 (ex.: s3://noharm-nifi): " S3_BUCKET_PATH
-  echo "S3_BUCKET_PATH=${S3_BUCKET_PATH}" >> "$ENV_FILE"
-else
-  S3_BUCKET_PATH=$(grep "^S3_BUCKET_PATH=" "$ENV_FILE" | cut -d'=' -f2-)
-fi
+# Solicitar ou usar parâmetros
+NOME_DO_CLIENTE=$(verify_or_request_param "NOME_DO_CLIENTE" "Informe o nome do cliente")
+SERVICO_NIFI=$(verify_or_request_param "SERVICO_NIFI" "Informe o nome do serviço do NiFi")
+S3_BUCKET_PATH=$(verify_or_request_param "S3_BUCKET_PATH" "Informe o caminho do S3 (ex.: s3://noharm-nifi)")
 
 # Confirmação dos parâmetros
 echo "Cliente: $NOME_DO_CLIENTE"
