@@ -81,25 +81,25 @@ echo "Caminho S3: $S3_BUCKET_PATH"
 
 # Conexão ao contêiner Docker e sincronização
 echo "Conectando ao contêiner Docker: $SERVICO_NIFI"
-docker exec -i "$SERVICO_NIFI" /bin/bash <<EOF
-echo "Dentro do contêiner $SERVICO_NIFI..."
+docker exec -i "$SERVICO_NIFI" bash -c "
+echo 'Dentro do contêiner $SERVICO_NIFI...'
 
 # Caminho local da pasta conf na raiz do contêiner
-LOCAL_CONF_DIR="/conf"
+LOCAL_CONF_DIR='/conf'
 
 # Caminho remoto no S3
-S3_CONF_DIR="${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf"
+S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf'
 
 # Verificar se a pasta conf existe
-if [ -d "\$LOCAL_CONF_DIR" ]; then
-  echo "Sincronizando arquivos..."
+if [ -d \"\$LOCAL_CONF_DIR\" ]; then
+  echo 'Sincronizando arquivos...'
 
   # Sincronizar somente arquivos .json.gz e .xml.gz
-  rsync -avz --include="*.json.gz" --include="*.xml.gz" --exclude="*" \
-    "\$LOCAL_CONF_DIR/" "\$S3_CONF_DIR/"
+  rsync -avz --include=\"*.json.gz\" --include=\"*.xml.gz\" --exclude=\"*\" \
+    \"\$LOCAL_CONF_DIR/\" \"\$S3_CONF_DIR/\"
 
-  echo "Sincronização concluída."
+  echo 'Sincronização concluída.'
 else
-  echo "Pasta conf não encontrada dentro do contêiner."
+  echo 'Pasta conf não encontrada dentro do contêiner.'
 fi
-EOF
+"
