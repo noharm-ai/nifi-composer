@@ -83,7 +83,7 @@ echo "Caminho S3: $S3_BUCKET_PATH"
 echo "Conectando ao contêiner Docker: $SERVICO_NIFI"
 
 # Use valores diretamente no docker exec para evitar substituições incorretas
-docker exec -i "$SERVICO_NIFI" bash -c "
+docker exec -it "$SERVICO_NIFI" bash -c "
 LOCAL_CONF_DIR='/conf'
 S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf'
 
