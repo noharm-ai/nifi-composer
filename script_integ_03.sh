@@ -35,33 +35,9 @@ configure_param() {
   echo "$param_value"
 }
 
-# Leitura de argumentos da linha de comando
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --cliente)
-      NOME_DO_CLIENTE="$2"
-      shift 2
-      ;;
-    --servico)
-      SERVICO_NIFI="$2"
-      shift 2
-      ;;
-    *)
-      echo "Uso: $0 --cliente <NOME_DO_CLIENTE> --servico <SERVICO_NIFI>"
-      exit 1
-      ;;
-  esac
-done
-
 # Configurar parâmetros
 NOME_DO_CLIENTE=$(configure_param "NOME_DO_CLIENTE" "$NOME_DO_CLIENTE")
 SERVICO_NIFI=$(configure_param "SERVICO_NIFI" "$SERVICO_NIFI")
-
-# Verificar se os parâmetros estão configurados corretamente
-if [ -z "$NOME_DO_CLIENTE" ] || [ -z "$SERVICO_NIFI" ]; then
-  echo "Erro: Parâmetros obrigatórios não configurados. Certifique-se de passar --cliente e --servico corretamente."
-  exit 1
-fi
 
 # Configurar S3_BUCKET_PATH fixo
 S3_BUCKET_PATH="s3://noharm-nifi"
@@ -78,11 +54,6 @@ if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_
   echo "Erro: Credenciais AWS não configuradas no arquivo $ENV_FILE."
   exit 1
 fi
-
-# Exibir os valores configurados para depuração
-echo "### Cliente: $NOME_DO_CLIENTE"
-echo "### Serviço: $SERVICO_NIFI"
-echo "### Caminho S3: $S3_BUCKET_PATH"
 
 # Verificar se o contêiner existe antes de executar o comando
 echo "Verificando se o contêiner '$SERVICO_NIFI' está ativo..."
