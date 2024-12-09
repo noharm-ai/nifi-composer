@@ -6,7 +6,7 @@ SCRIPT_DIR="$BASE_DIR/nifi-scripts"
 
 # Garantir que a pasta nifi-scripts exista
 if [ ! -d "$SCRIPT_DIR" ]; then
-  echo "### Criando o diretório $SCRIPT_DIR..."
+  echo "Criando o diretório $SCRIPT_DIR..."
   mkdir -p "$SCRIPT_DIR"
   chmod 755 "$SCRIPT_DIR"
 fi
@@ -22,7 +22,7 @@ configure_param() {
   # Se o valor foi passado por argumento, configurá-lo
   if [ -n "$param_value" ]; then
     echo "$param_name=$param_value" >> "$ENV_FILE"
-    echo "$param_name configurado com o valor: $param_value"
+    echo "$param_value" # Retorna apenas o valor
   else
     # Caso contrário, buscar no arquivo noharm.env
     if grep -q "^${param_name}=" "$ENV_FILE"; then
@@ -31,10 +31,8 @@ configure_param() {
       echo "Erro: $param_name não foi passado e não está configurado no $ENV_FILE."
       exit 1
     fi
+    echo "$param_value" # Retorna apenas o valor
   fi
-
-  # Retorna o valor do parâmetro
-  echo "$param_value"
 }
 
 # Valores padrão
@@ -65,12 +63,13 @@ SERVICO_NIFI=$(configure_param "SERVICO_NIFI" "$SERVICO_NIFI")
 
 # Configurar S3_BUCKET_PATH fixo
 S3_BUCKET_PATH="https://sa-east-1.console.aws.amazon.com/s3/buckets/noharm-nifi?region=sa-east-1&bucketType=general&tab=objects"
+echo "S3_BUCKET_PATH está fixado como: $S3_BUCKET_PATH"
 
 # Atualizar o valor no arquivo noharm.env
 if grep -q "^S3_BUCKET_PATH=" "$ENV_FILE"; then
   sed -i "s|^S3_BUCKET_PATH=.*|S3_BUCKET_PATH=$S3_BUCKET_PATH|" "$ENV_FILE"
 else
-  echo "### S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
+  echo "S3_BUCKET_PATH=$S3_BUCKET_PATH" >> "$ENV_FILE"
 fi
 
 # Confirmação dos parâmetros
@@ -84,13 +83,9 @@ echo "### docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 
 # Verificar se o contêiner existe antes de executar o comando
 if ! docker ps --format '{{.Names}}' | grep -q "^${SERVICO_NIFI}$"; then
-  echo "### Erro: O contêiner $SERVICO_NIFI não está em execução."
+  echo "Erro: O contêiner $SERVICO_NIFI não está em execução."
   exit 1
 fi
-
-echo "### Comando Docker executado:"
-echo "### docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
-
 
 # Conexão ao contêiner Docker e sincronização
 docker exec -it "$SERVICO_NIFI" bash -c "
@@ -118,4 +113,11 @@ echo 'Dentro do contêiner $SERVICO_NIFI...'
 if [ -d \"\$LOCAL_CONF_DIR\" ]; then
   echo 'Sincronizando arquivos...'
 
-  rsync -avz
+  rsync -avz --include=\"*.json.gz\" --include=\"*.xml.gz\" --exclude=\"*\" \
+    \"\$LOCAL_CONF_DIR/\" \"\$S3_CONF_DIR/\"
+
+  echo 'Sincronização concluída.'
+else
+  echo 'Pasta conf não encontrada dentro do contêiner.'
+fi
+"
