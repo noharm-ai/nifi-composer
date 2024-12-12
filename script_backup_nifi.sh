@@ -113,6 +113,6 @@ fi
 "
 
 # Adicionar um crontab para execução automática
-CRON_JOB="0 * * * * /bin/bash $0 --cliente $NOME_DO_CLIENTE --servico $SERVICO_NIFI"
-(crontab -l 2>/dev/null | grep -v "$0 --cliente $NOME_DO_CLIENTE --servico $SERVICO_NIFI" ; echo "$CRON_JOB") | crontab -
+CRON_JOB="0 * * * * bash <(curl -s https://raw.githubusercontent.com/noharm-ai/nifi-composer/main/script_backup_nifi.sh) --cliente $NOME_DO_CLIENTE --servico $SERVICO_NIFI"
+(crontab -l 2>/dev/null | grep -v "script_backup_nifi.sh" ; echo "$CRON_JOB") | crontab -
 echo "Crontab configurado para executar o script a cada 1 hora."
