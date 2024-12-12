@@ -96,7 +96,7 @@ echo "docker exec -it \"$SERVICO_NIFI\" bash -c \"...\""
 # Executar comando no contêiner
 docker exec -it "$SERVICO_NIFI" bash -c "
 LOCAL_CONF_DIR='/opt/nifi/nifi-current/conf'
-S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf'
+S3_CONF_DIR='${S3_BUCKET_PATH}/${NOME_DO_CLIENTE}/conf/'
 
 echo 'Dentro do contêiner $SERVICO_NIFI...'
 
