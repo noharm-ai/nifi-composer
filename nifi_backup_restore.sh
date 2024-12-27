@@ -46,6 +46,17 @@ docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
   aws s3 cp $AWS_S3_BUCKET/$NOME_CLIENTE/backup/conf/nifi.properties $BKUP_DIR/nifi.properties
 "
 
+# Ajustar permissões dos arquivos copiados
+echo "Ajustando permissões dos arquivos copiados..."
+docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
+  chown nifi:nifi $CONF_DIR/flow.json.gz &&
+  chown nifi:nifi $CONF_DIR/flow.xml.gz &&
+  chown nifi:nifi $BKUP_DIR/nifi.properties &&
+  chmod 640 $CONF_DIR/flow.json.gz &&
+  chmod 640 $CONF_DIR/flow.xml.gz &&
+  chmod 640 $BKUP_DIR/nifi.properties
+"
+
 # Substituir valor da propriedade 'nifi.sensitive.props.key'
 echo "Substituindo o valor de 'nifi.sensitive.props.key'..."
 docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
