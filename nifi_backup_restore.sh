@@ -84,13 +84,6 @@ docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
   prop_replace 'nifi.sensitive.props.key' \"\$BKUP_PROP_KEY\" '$CONF_DIR/nifi.properties'
 "
 
-# Trocar arquivos entre /conf e /bkp
-echo "Trocando arquivos entre /conf e /bkp..."
-docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
-  mv $CONF_DIR/nifi.properties $BKUP_DIR/nifi.properties.bkp &&
-  mv $BKUP_DIR/nifi.properties $CONF_DIR/nifi.properties
-"
-
 # Reiniciar o serviço
 echo "Reiniciando o serviço NiFi..."
 docker restart "$DOCKER_CONTAINER"
