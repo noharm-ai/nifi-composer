@@ -9,7 +9,7 @@ services:
  nifi:
     container_name: "noharm-nifi"
     hostname: "noharm-nifi"
-    image: "apache/nifi:1.28.0"
+    image: "apache/nifi:1.28.1"
     entrypoint: ["bash", "-c", "/opt/nifi/scripts/ext/update_nifi.sh; /opt/nifi/scripts/start.sh"]
     env_file:
       - ./noharm.env
