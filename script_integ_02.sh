@@ -44,6 +44,9 @@ remove_and_clone_repository() {
     fi
 
     clone_repository_and_generate_password  # Clona o repositório e gera a senha
+
+    update_env_file
+    ln -sf "$ENV_FILE_PATH" nifi-composer/.env
 }
 
 # Função para parar e remover containers, redes, volumes, e imagens
@@ -52,7 +55,7 @@ cleanup_containers() {
     
     if [ -f "nifi-composer/docker-compose.yml" ]; then
         cd nifi-composer
-        docker compose down --volumes --remove-orphans
+        docker compose --env-file noharm.env down --volumes --remove-orphans
         check_status "Falha ao parar e remover containers"
         echo "### Containers removidos com sucesso."
         cd ..
@@ -72,7 +75,8 @@ retry_docker_pull() {
     while [ $retry_count -lt $max_retries ]; do
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
         cd nifi-composer
-        docker compose up -d
+        docker compose --env-file noharm.env up -d
+        
         if [ $? -eq 0 ]; then
             success=true
             break
