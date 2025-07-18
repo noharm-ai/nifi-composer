@@ -14,8 +14,6 @@ check_status() {
 # Função para clonar o repositório e gerar a senha para o usuário nifi_noharm
 clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
-
-    # Clonar o repositório depois de remover o diretório antigo
     git clone https://github.com/noharm-ai/nifi-composer/
     check_status "Falha ao clonar o repositório 'nifi-composer'"
 
@@ -23,28 +21,24 @@ clone_repository_and_generate_password() {
     ./update_secrets.sh
     check_status "Falha ao executar o script 'update_secrets.sh'"
 
-    # Verificando se o arquivo noharm.env foi criado corretamente
     if [ ! -f "$ENV_FILE_PATH" ]; then
         echo "### Erro: Arquivo noharm.env não foi encontrado após a execução de update_secrets.sh."
         exit 1
     fi
 
-    # Armazenando a senha gerada
     PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" "$ENV_FILE_PATH" | cut -d '=' -f2)
-
-    cd ..  # Voltando ao diretório anterior após clonar e gerar senha
+    cd ..
 }
 
 # Função para remover a pasta "nifi-composer" e recomeçar o processo
 remove_and_clone_repository() {
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
-        sudo rm -rf nifi-composer  # Removendo completamente o diretório existente
+        sudo rm -rf nifi-composer
         check_status "Falha ao remover a pasta 'nifi-composer'"
     fi
 
-    clone_repository_and_generate_password  # Clona o repositório e gera a senha
-
+    clone_repository_and_generate_password
     update_env_file
     ln -sf "$ENV_FILE_PATH" nifi-composer/.env
 }
@@ -52,7 +46,6 @@ remove_and_clone_repository() {
 # Função para parar e remover containers, redes, volumes, e imagens
 cleanup_containers() {
     echo "### Parando e removendo containers e volumes..."
-    
     if [ -f "nifi-composer/docker-compose.yml" ]; then
         cd nifi-composer
         docker compose --env-file noharm.env down --volumes --remove-orphans
@@ -76,10 +69,8 @@ retry_docker_pull() {
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
         cd nifi-composer
         docker compose --env-file noharm.env up -d
-
         if [ $? -eq 0 ]; then
-            success=true
-            break
+            success=true; break
         fi
         echo "### Falha ao fazer pull da imagem, aguardando $sleep_time segundos antes de tentar novamente..."
         sleep $sleep_time
@@ -153,7 +144,7 @@ update_env_file() {
     else
         sed -i "s|^DB_MULTI_QUERY=.*|DB_MULTI_QUERY=SELECT DISTINCT(NOME), FKPESSOA FROM VW_PACIENTES WHERE FKPESSOA IN ({})|" "$ENV_FILE_PATH"
     fi
-    echo "### Arquivo noharm.env atualizado com sucesso."
+    echo "### Arquivo noharm.env atualizado com sucesso."  
 }
 
 # Função para instalar e iniciar containers
@@ -174,7 +165,7 @@ modify_renew_cert_script() {
     fi
     docker exec --user="root" -it "$container_name" sed -i "s|SSL_URL=.*|SSL_URL=${GETNAME_SSL_URL}|" /app/renew_cert.sh
     check_status "Falha ao modificar o script renew_cert.sh no container $container_name"
-    echo "### Modificação do renew_cert.sh concluída com sucesso."
+    echo "### Modificação do renew_cert.sh concluída com sucesso."  
 }
 
 # Prepara estrutura de volumes externos
@@ -189,7 +180,7 @@ prepare_volumes(){
 copy_dir_containers(){  
     echo ">>> Copiando dados do container para volumes externos..."
     docker stop noharm-nifi
-    declare -a paths=("conf" "database_repository" "flowfile_repository" 
+    declare -a paths=("conf" "database_repository" "flowfile_repository"  
                     "content_repository" "provenance_repository" "state" "logs")
     for path in "${paths[@]}"; do
         echo "→ Copiando ${path}..."
