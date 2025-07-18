@@ -16,6 +16,7 @@ fi
 echo ">>> Preparando volumes externos em ./nifi-data..."
 mkdir -p nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
 chown -R 1000:1000 nifi-data/
+chmod -R 700 nifi-data
 
 # ---------------------------------------------------------------------------
 # Copia os dados do container (com progresso)
@@ -34,9 +35,7 @@ done
 # Recria o container
 # ---------------------------------------------------------------------------
 echo ">>> Recriando container com compose down e up..."
-set -a
-source noharm.env
-set +a
+export $(grep -E '^AWS_' noharm.env | xargs)
 docker compose down nifi
 docker compose up -d nifi
 
