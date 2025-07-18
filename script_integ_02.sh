@@ -201,6 +201,16 @@ create_credentials_and_configure(){
     echo "Configuração AWS concluída com sucesso"
 }
 
+# Função para aguardar o container noharm-nifi ficar em estado Running
+wait_for_nifi() {
+    echo "### Aguardando o container noharm-nifi iniciar..."
+    until docker inspect -f '{{.State.Running}}' noharm-nifi 2>/dev/null | grep true >/dev/null; do
+        echo "### Aguardando 5 segundos..."
+        sleep 5
+    done
+    echo "### Container noharm-nifi iniciado com sucesso."
+}
+
 # Função principal
 main() {
     if [ "$#" -lt 14 ]; then
@@ -240,7 +250,8 @@ main() {
     fi
 
     echo "### Aguardando 1 minuto para garantir que o container noharm-nifi esteja totalmente iniciado..."
-    sleep 60
+    # Substituído sleep 60 pelo wait_for_nifi
+    wait_for_nifi
 
     echo "### Executando comando de geração de chaves no container noharm-nifi..."
     docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
