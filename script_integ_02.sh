@@ -76,7 +76,7 @@ retry_docker_pull() {
         echo "### Tentativa de pull de containers ($((retry_count+1))/$max_retries)..."
         cd nifi-composer
         docker compose --env-file noharm.env up -d
-        
+
         if [ $? -eq 0 ]; then
             success=true
             break
@@ -123,7 +123,8 @@ test_services() {
     check_status "Falha ao verificar o serviço para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID"
 }
 
-# Função para atualizar o arquivo de ambiental update_env_file() {
+# Função para atualizar o arquivo de ambiente
+update_env_file() {
     echo "### Atualizando variáveis de ambiente no arquivo noharm.env..."
     if [ ! -f "$ENV_FILE_PATH" ]; then
         echo "### Erro: Arquivo noharm.env não encontrado. Verifique a execução de update_secrets.sh."
