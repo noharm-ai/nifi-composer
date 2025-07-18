@@ -39,7 +39,7 @@ clone_repository_and_generate_password() {
 remove_and_clone_repository() {
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
-        rm -rf nifi-composer  # Removendo completamente o diretório existente
+        sudo rm -rf nifi-composer  # Removendo completamente o diretório existente
         check_status "Falha ao remover a pasta 'nifi-composer'"
     fi
 
@@ -189,6 +189,47 @@ modify_renew_cert_script() {
     echo "### Modificação do renew_cert.sh concluída com sucesso."
 }
 
+# Prepara estrutura de volumes (sobrescreve se existir)
+prepare_volumes(){
+    echo ">>> Preparando volumes externos em ./nifi-data..."
+    mkdir -p nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
+    chown -R 1000:1000 nifi-data/
+    chmod -R 700 nifi-data
+}
+
+# Copia os dados do container (com progresso)
+copy_dir_containers(){  
+    echo ">>> Copiando dados do container para volumes externos..."
+    docker stop noharm-nifi
+
+    declare -a paths=("conf" "database_repository" "flowfile_repository" 
+                    "content_repository" "provenance_repository" "state" "logs")
+    for path in "${paths[@]}"; do
+    echo "→ Copiando ${path}..."
+    docker cp noharm-nifi:/opt/nifi/nifi-current/${path}/ ./nifi-data/
+    done
+}
+
+create_credentials_and_configure(){
+
+    export $(grep -E '^AWS_' noharm.env | xargs)
+
+    # Cria o arquivo de credenciais no formato específico DENTRO DO CONTAINER
+    docker exec -u root noharm-nifi bash -c "echo 'accessKey=${AWS_ACCESS_KEY_ID}' > /opt/nifi/nifi-current/aws_credentials && \
+    echo 'secretKey=${AWS_SECRET_ACCESS_KEY}' >> /opt/nifi/nifi-current/aws_credentials && \
+    chown nifi:nifi /opt/nifi/nifi-current/aws_credentials && \
+    chmod 600 /opt/nifi/nifi-current/aws_credentials"
+
+    # Configuração adicional do AWS CLI (opcional) DENTRO DO CONTAINER
+    docker exec -u root noharm-nifi bash -c "mkdir -p /home/nifi/.aws && \
+    echo -e '[default]\nregion = ${AWS_DEFAULT_REGION:-sa-east-1}\noutput = json' > /home/nifi/.aws/config && \
+    echo -e '[default]\naws_access_key_id = ${AWS_ACCESS_KEY_ID}\naws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}' > /home/nifi/.aws/credentials && \
+    chown -R nifi:nifi /home/nifi/.aws && \
+    chmod -R 700 /home/nifi/.aws"
+
+    echo "Configuração AWS concluída com sucesso"
+}
+
 # Função principal que controla a execução do script
 main() {
     if [ "$#" -lt 15 ]; then
@@ -274,6 +315,12 @@ main() {
     echo "### Reiniciando o serviço noharm-nifi para aplicar as configurações de segurança..."
     docker restart noharm-nifi
     check_status "Falha ao reiniciar o container noharm-nifi"
+
+    prepare_volumes
+    copy_dir_containers
+    create_credentials_and_configure
+    docker start noharm-nifi
+
 }
 
 main "$@"
