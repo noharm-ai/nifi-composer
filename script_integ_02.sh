@@ -222,9 +222,20 @@ generate_and_configure_keys() {
         echo "### Tentativa 1 falhou, reiniciando Nifi e aguardando 10s para retry..."
         docker restart noharm-nifi || check_status "Erro restart nifi antes do retry"
         sleep 10
-        echo "### Gerando chaves no Nifi (tentativa 2)..."
-        docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh \
-        || check_status "Erro genkeypair após retry"
+
+        for attempt in 2 3; do
+            echo "### Gerando chaves no Nifi (tentativa $attempt)..."
+            if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
+            echo "### Chaves geradas com sucesso na tentativa $attempt."; break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+            check_status "Erro genkeypair após terceira tentativa"
+            fi
+            echo "### Tentativa $attempt falhou, reiniciando Nifi e aguardando 10s..."
+            docker restart noharm-nifi || check_status "Erro restart nifi na tentativa $attempt"
+            wait_nifi_running
+            sleep 10
+        done
     fi
 
     modify_renew_cert_script
