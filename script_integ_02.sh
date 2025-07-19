@@ -208,15 +208,13 @@ wait_nifi_running() {
         if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi)" = "true" ]; then
         echo "### Container iniciado"; return
         fi
-        sleep 5
+        sleep 60
     done
     check_status "noharm-nifi não entrou em Running em tempo"
 }
 
 # Agrupa a espera, geração de chave e reinício do getname
 generate_and_configure_keys() {
-    wait_nifi_running
-
     for attempt in 1 2 3; do
         echo "### Gerando chaves no Nifi (tentativa $attempt)..."
         if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
@@ -224,7 +222,7 @@ generate_and_configure_keys() {
         fi
         # Em falha de namespace ou procReady, reiniciar e aguardar
         if [ "$attempt" -lt 3 ]; then
-        echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
+        echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 60s antes do retry..."
         docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
         wait_nifi_running
         sleep 60
