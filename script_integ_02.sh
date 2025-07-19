@@ -216,8 +216,17 @@ wait_nifi_running() {
 # Agrupa a espera, geração de chave e reinício do getname
 generate_and_configure_keys() {
     wait_nifi_running
-    echo "### Gerando chaves no Nifi..."
-    docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh || check_status "Erro genkeypair"
+
+    echo "### Gerando chaves no Nifi (tentativa 1)..."
+    if ! docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
+        echo "### Tentativa 1 falhou, reiniciando Nifi e aguardando 10s para retry..."
+        docker restart noharm-nifi || check_status "Erro restart nifi antes do retry"
+        sleep 10
+        echo "### Gerando chaves no Nifi (tentativa 2)..."
+        docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh \
+        || check_status "Erro genkeypair após retry"
+    fi
+
     modify_renew_cert_script
     docker restart noharm-getname || check_status "Erro restart getname"
 }
