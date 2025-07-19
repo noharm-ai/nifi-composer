@@ -201,14 +201,38 @@ create_credentials_and_configure(){
     echo "Configuração AWS concluída com sucesso"
 }
 
-# Função para aguardar o container noharm-nifi ficar em estado Running
-wait_for_nifi() {
-    echo "### Aguardando o container noharm-nifi iniciar..."
-    until docker inspect -f '{{.State.Running}}' noharm-nifi 2>/dev/null | grep true >/dev/null; do
-        echo "### Aguardando 5 segundos..."
-        sleep 5
-    done
-    echo "### Container noharm-nifi iniciado com sucesso."
+# Função para esperar o container noharm-nifi entrar em estado Running
+wait_nifi_running() {
+  echo "### Aguardando noharm-nifi ficar running..."
+  for i in {1..12}; do
+    if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi 2>/dev/null)" == "true" ]; then
+      echo "### noharm-nifi está running"
+      return
+    fi
+    echo "### Ainda não está running, aguardando 5s..."
+    sleep 5
+  done
+  echo "### Erro: noharm-nifi não iniciou"
+  exit 1
+}
+
+# Função para gerar as chaves somente depois de verificar que o Nifi está UP
+generate_and_configure_keys() {
+  wait_nifi_running
+  echo "### Gerando chave no nifi..."
+  docker exec --user=root noharm-nifi \
+    sh -c /opt/nifi/scripts/ext/genkeypair.sh \
+    || check_status "Erro genkeypair"
+  modify_renew_cert_script
+  docker restart noharm-getname || check_status "Erro restart getname"
+}
+
+# Função para reiniciar e exibir configs de segurança depois de gerar as chaves
+finalize_and_restart_nifi() {
+  echo "### Exibindo security configs..."
+  docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
+  echo "### Reiniciando noharm-nifi..."
+  docker restart noharm-nifi || check_status "Erro restart nifi"
 }
 
 # Função principal
@@ -249,21 +273,11 @@ main() {
         fi
     fi
 
-    echo "### Aguardando 1 minuto para garantir que o container noharm-nifi esteja totalmente iniciado..."
-    # Substituído sleep 60 pelo wait_for_nifi
-    wait_for_nifi
-
-    echo "### Executando comando de geração de chaves no container noharm-nifi..."
-    docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
-    check_status "Falha ao executar o comando de geração de chaves no container noharm-nifi"
-
-    modify_renew_cert_script
-    echo "### Reiniciando o serviço noharm-getname para aplicar as modificações do ssl..."
-    docker restart noharm-getname
-    check_status "Falha ao reiniciar o container noharm-getname"
-
+    # substituído sleep+exec direto por função que aguarda Nifi
+    generate_and_configure_keys
     test_aws_cli_in_nifi
     test_services
+    finalize_and_restart_nifi
 
     echo "### Script executado com sucesso!"
     echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
