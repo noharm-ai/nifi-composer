@@ -217,26 +217,21 @@ wait_nifi_running() {
 generate_and_configure_keys() {
     wait_nifi_running
 
-    echo "### Gerando chaves no Nifi (tentativa 1)..."
-    if ! docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
-        echo "### Tentativa 1 falhou, reiniciando Nifi e aguardando 10s para retry..."
-        docker restart noharm-nifi || check_status "Erro restart nifi antes do retry"
-        sleep 10
-
-        for attempt in 2 3; do
-            echo "### Gerando chaves no Nifi (tentativa $attempt)..."
-            if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
-            echo "### Chaves geradas com sucesso na tentativa $attempt."; break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-            check_status "Erro genkeypair após terceira tentativa"
-            fi
-            echo "### Tentativa $attempt falhou, reiniciando Nifi e aguardando 10s..."
-            docker restart noharm-nifi || check_status "Erro restart nifi na tentativa $attempt"
-            wait_nifi_running
-            sleep 10
-        done
-    fi
+    for attempt in 1 2 3; do
+        echo "### Gerando chaves no Nifi (tentativa $attempt)..."
+        if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
+        echo "### Chaves geradas com sucesso na tentativa $attempt."; break
+        fi
+        # Em falha de namespace ou procReady, reiniciar e aguardar
+        if [ "$attempt" -lt 3 ]; then
+        echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
+        docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
+        wait_nifi_running
+        sleep 15
+        else
+        check_status "Erro genkeypair após 3 tentativas"
+        fi
+    done
 
     modify_renew_cert_script
     docker restart noharm-getname || check_status "Erro restart getname"
