@@ -201,7 +201,7 @@ create_credentials_and_configure(){
     echo "Configuração AWS concluída com sucesso"
 }
 
- # Espera o container ficar realmente RUNNING, até 12 tentativas de 5s
+# Espera o container ficar realmente RUNNING, até 12 tentativas de 5s
 wait_nifi_running() {
     echo "### Aguardando noharm-nifi ficar running..."
     for i in {1..12}; do
@@ -213,7 +213,7 @@ wait_nifi_running() {
     check_status "noharm-nifi não entrou em Running em tempo"
 }
 
- # Agrupa a espera, geração de chave e reinício do getname
+# Agrupa a espera, geração de chave e reinício do getname
 generate_and_configure_keys() {
     wait_nifi_running
     echo "### Gerando chaves no Nifi..."
@@ -222,7 +222,7 @@ generate_and_configure_keys() {
     docker restart noharm-getname || check_status "Erro restart getname"
 }
 
- # Exibe configs de segurança e reinicia o Nifi
+# Exibe configs de segurança e reinicia o Nifi
 finalize_and_restart_nifi() {
     docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
     docker restart noharm-nifi || check_status "Erro restart nifi"
