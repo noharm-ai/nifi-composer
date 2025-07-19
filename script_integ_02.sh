@@ -227,7 +227,7 @@ generate_and_configure_keys() {
         echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
         docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
         wait_nifi_running
-        sleep 15
+        sleep 60
         else
         check_status "Erro genkeypair após 3 tentativas"
         fi
