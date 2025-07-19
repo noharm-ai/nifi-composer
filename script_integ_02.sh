@@ -201,38 +201,31 @@ create_credentials_and_configure(){
     echo "Configuração AWS concluída com sucesso"
 }
 
-# Função para esperar o container noharm-nifi entrar em estado Running
+ # Espera o container ficar realmente RUNNING, até 12 tentativas de 5s
 wait_nifi_running() {
-  echo "### Aguardando noharm-nifi ficar running..."
-  for i in {1..12}; do
-    if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi 2>/dev/null)" == "true" ]; then
-      echo "### noharm-nifi está running"
-      return
-    fi
-    echo "### Ainda não está running, aguardando 5s..."
-    sleep 5
-  done
-  echo "### Erro: noharm-nifi não iniciou"
-  exit 1
+    echo "### Aguardando noharm-nifi ficar running..."
+    for i in {1..12}; do
+        if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi)" = "true" ]; then
+        echo "### Container iniciado"; return
+        fi
+        sleep 5
+    done
+    check_status "noharm-nifi não entrou em Running em tempo"
 }
 
-# Função para gerar as chaves somente depois de verificar que o Nifi está UP
+ # Agrupa a espera, geração de chave e reinício do getname
 generate_and_configure_keys() {
-  wait_nifi_running
-  echo "### Gerando chave no nifi..."
-  docker exec --user=root noharm-nifi \
-    sh -c /opt/nifi/scripts/ext/genkeypair.sh \
-    || check_status "Erro genkeypair"
-  modify_renew_cert_script
-  docker restart noharm-getname || check_status "Erro restart getname"
+    wait_nifi_running
+    echo "### Gerando chaves no Nifi..."
+    docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh || check_status "Erro genkeypair"
+    modify_renew_cert_script
+    docker restart noharm-getname || check_status "Erro restart getname"
 }
 
-# Função para reiniciar e exibir configs de segurança depois de gerar as chaves
+ # Exibe configs de segurança e reinicia o Nifi
 finalize_and_restart_nifi() {
-  echo "### Exibindo security configs..."
-  docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
-  echo "### Reiniciando noharm-nifi..."
-  docker restart noharm-nifi || check_status "Erro restart nifi"
+    docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
+    docker restart noharm-nifi || check_status "Erro restart nifi"
 }
 
 # Função principal
