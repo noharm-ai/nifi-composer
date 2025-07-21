@@ -90,12 +90,12 @@ install_aws_cli_in_nifi() {
     container_name="noharm-nifi"
     echo "### Instalando AWS CLI no container $container_name..."
     docker exec --user="root" -it "$container_name" apt update
-    docker exec --user="root" -it "$container_name" apt install awscli -y
-
-    docker exec --user=root noharm-nifi bash -c "apt update && apt install wget -y"
+    docker exec --user="root" -it "$container_name" bash -c "\
+      apt update && apt install -y awscli wget && \
+      chown nifi:nifi /opt/nifi/nifi-current/conf/bootstrap.conf"
 
     # Ajustar permissões nos arquivos de configuração
-    docker exec --user=root noharm-nifi bash -c 'chown nifi:nifi /opt/nifi/nifi-current/conf/bootstrap.conf'
+    # docker exec --user=root noharm-nifi bash -c 'chown nifi:nifi /opt/nifi/nifi-current/conf/bootstrap.conf'
 
     check_status "Falha ao instalar AWS CLI no container $container_name"
 }
@@ -224,16 +224,16 @@ generate_and_configure_keys() {
     for attempt in 1 2 3; do
         echo "### Gerando chaves no Nifi (tentativa $attempt)..."
         if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
-        echo "### Chaves geradas com sucesso na tentativa $attempt."; break
+            echo "### Chaves geradas com sucesso na tentativa $attempt."; break
         fi
         # Em falha de namespace ou procReady, reiniciar e aguardar
         if [ "$attempt" -lt 3 ]; then
-        echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
-        docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
-        wait_nifi_running
-        sleep 15
+            echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
+            docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
+            wait_nifi_running
+            sleep 15
         else
-        check_status "Erro genkeypair após 3 tentativas"
+            check_status "Erro genkeypair após 3 tentativas"
         fi
     done
 
@@ -245,7 +245,7 @@ generate_and_configure_keys() {
 finalize_and_restart_nifi() {
     docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
     docker restart noharm-nifi || check_status "Erro restart nifi"
-    
+
 }
 
 # Função principal
