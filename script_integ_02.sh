@@ -245,6 +245,7 @@ generate_and_configure_keys() {
 finalize_and_restart_nifi() {
     docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
     docker restart noharm-nifi || check_status "Erro restart nifi"
+    
 }
 
 # Função principal
