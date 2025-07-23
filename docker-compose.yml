@@ -28,20 +28,8 @@ services:
     restart: "always"
     user: "nifi"
     working_dir: "/opt/nifi/nifi-current"
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-sa-east-1}
     volumes:
       - ./:/opt/nifi/scripts/ext/
-      - ./nifi-data/conf:/opt/nifi/nifi-current/conf
-      - ./nifi-data/database_repository:/opt/nifi/nifi-current/database_repository
-      - ./nifi-data/flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
-      - ./nifi-data/content_repository:/opt/nifi/nifi-current/content_repository
-      - ./nifi-data/provenance_repository:/opt/nifi/nifi-current/provenance_repository
-      - ./nifi-data/state:/opt/nifi/nifi-current/state
-      - ./nifi-data/logs:/opt/nifi/nifi-current/logs
-      - ./init-nifi.sh:/opt/nifi/init.sh
  myanony:
     container_name: "noharm-anony"
     hostname: "noharm-anony"
