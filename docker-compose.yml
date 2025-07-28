@@ -12,6 +12,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      privileged: true
+      user: root
     entrypoint: ["bash", "-c", "/opt/nifi/scripts/ext/update_nifi.sh; /opt/nifi/scripts/start.sh"]
     env_file:
       - ./noharm.env
@@ -28,7 +30,7 @@ services:
     ports:
       - "8443:8443/tcp"
     restart: "always"
-    user: "nifi"
+    #user: "nifi"
     working_dir: "/opt/nifi/nifi-current"
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -43,7 +45,7 @@ services:
       - ./nifi-data/provenance_repository:/opt/nifi/nifi-current/provenance_repository
       - ./nifi-data/state:/opt/nifi/nifi-current/state
       - ./nifi-data/logs:/opt/nifi/nifi-current/logs
-      - ./init-nifi.sh:/opt/nifi/init.sh
+      #- ./init-nifi.sh:/opt/nifi/init.sh
  myanony:
     container_name: "noharm-anony"
     hostname: "noharm-anony"
