@@ -12,8 +12,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      privileged: true
-      user: root
+    privileged: true
+    user: root
     entrypoint: ["bash", "-c", "/opt/nifi/scripts/ext/update_nifi.sh; /opt/nifi/scripts/start.sh"]
     env_file:
       - ./noharm.env
