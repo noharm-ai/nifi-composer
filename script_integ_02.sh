@@ -16,8 +16,11 @@ clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
 
     # Clonar o repositório depois de remover o diretório antigo
-    git clone https://github.com/noharm-ai/nifi-composer/
-    check_status "Falha ao clonar o repositório 'nifi-composer'"
+    echo "### Clonando branch '$BRANCH_GIT' do repositório e gerando senha para nifi_noharm..."
+    git clone --branch "$BRANCH_GIT" --single-branch https://github.com/noharm-ai/nifi-composer.git
+    check_status "Falha ao clonar a branch '$BRANCH_GIT'"
+
+    # 
 
     cd nifi-composer/
     ./update_secrets.sh
@@ -285,6 +288,7 @@ main() {
     DB_MULTI_QUERY=${13}  # Passa a consulta ou os valores
     IDS_PATIENT=${14}
     CLIENT_NAME=${15}
+    BRANCH_GIT=${16}
     
     # Verifica se REINSTALL_MODE está "true"
     if [[ "$REINSTALL_MODE" == "true" ]]; then
