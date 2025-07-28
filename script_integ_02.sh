@@ -189,6 +189,80 @@ modify_renew_cert_script() {
     echo "### Modificação do renew_cert.sh concluída com sucesso."
 }
 
+# Prepara estrutura de volumes externos
+prepare_volumes(){
+    echo ">>> Preparando volumes externos em ./nifi-data..."
+    mkdir -p nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
+    chown -R 1000:1000 nifi-data/
+    chmod -R 700 nifi-data
+}
+
+# Copia dados do container para os volumes externos
+copy_dir_containers(){  
+    echo ">>> Copiando dados do container para volumes externos..."
+    docker stop noharm-nifi
+    declare -a paths=("conf" "database_repository" "flowfile_repository"  
+                    "content_repository" "provenance_repository" "state" "logs")
+    for path in "${paths[@]}"; do
+        echo "→ Copiando ${path}..."
+        docker cp noharm-nifi:/opt/nifi/nifi-current/${path}/ ./nifi-data/${path}/
+    done
+}
+
+# Cria credenciais AWS e configura dentro do container
+create_credentials_and_configure(){
+    export $(grep -E '^AWS_' nifi-composer/noharm.env | xargs)
+    docker exec -u root noharm-nifi bash -c "echo 'accessKey=${AWS_ACCESS_KEY_ID}' > /opt/nifi/nifi-current/aws_credentials && \
+    echo 'secretKey=${AWS_SECRET_ACCESS_KEY}' >> /opt/nifi/nifi-current/aws_credentials && \
+    chown nifi:nifi /opt/nifi/nifi-current/aws_credentials && chmod 600 /opt/nifi/nifi-current/aws_credentials"
+    docker exec -u root noharm-nifi bash -c "mkdir -p /home/nifi/.aws && \
+    echo -e '[default]\nregion = ${AWS_DEFAULT_REGION:-sa-east-1}\noutput = json' > /home/nifi/.aws/config && \
+    echo -e '[default]\naws_access_key_id = ${AWS_ACCESS_KEY_ID}\naws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}' > /home/nifi/.aws/credentials && \
+    chown -R nifi:nifi /home/nifi/.aws && chmod -R 700 /home/nifi/.aws"
+    echo "Configuração AWS concluída com sucesso"
+}
+
+# Espera o container ficar realmente RUNNING, até 12 tentativas de 5s
+wait_nifi_running() {
+    echo "### Aguardando noharm-nifi ficar running..."
+    for i in {1..12}; do
+        if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi)" = "true" ]; then
+        echo "### Container iniciado"; return
+        fi
+        sleep 60
+    done
+    check_status "noharm-nifi não entrou em Running em tempo"
+}
+
+# Agrupa a espera, geração de chave e reinício do getname
+generate_and_configure_keys() {
+    for attempt in 1 2 3; do
+        echo "### Gerando chaves no Nifi (tentativa $attempt)..."
+        if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
+            echo "### Chaves geradas com sucesso na tentativa $attempt."; break
+        fi
+        # Em falha de namespace ou procReady, reiniciar e aguardar
+        if [ "$attempt" -lt 3 ]; then
+            echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
+            docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
+            wait_nifi_running
+            sleep 15
+        else
+            check_status "Erro genkeypair após 3 tentativas"
+        fi
+    done
+
+    modify_renew_cert_script
+    docker restart noharm-getname || check_status "Erro restart getname"
+}
+
+# Exibe configs de segurança e reinicia o Nifi
+finalize_and_restart_nifi() {
+    docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
+    docker restart noharm-nifi || check_status "Erro restart nifi"
+
+}
+
 # Função principal que controla a execução do script
 main() {
     if [ "$#" -lt 15 ]; then
@@ -211,7 +285,7 @@ main() {
     DB_MULTI_QUERY=${13}  # Passa a consulta ou os valores
     IDS_PATIENT=${14}
     CLIENT_NAME=${15}
-
+    
     # Verifica se REINSTALL_MODE está "true"
     if [[ "$REINSTALL_MODE" == "true" ]]; then
         echo "### Modo de reinstalação ativado. Excluindo pasta e reinstalando do zero..."
@@ -229,17 +303,21 @@ main() {
         fi
     fi
 
+    # substituído sleep+exec direto por função que aguarda Nifi
+    generate_and_configure_keys
+
     # Aguardar 1 minuto antes de executar o comando de geração de chaves
     echo "### Aguardando 1 minuto para garantir que o container noharm-nifi esteja totalmente iniciado..."
     sleep 60
 
-    # Executa o comando de geração de chaves
-    echo "### Executando comando de geração de chaves no container noharm-nifi..."
-    docker exec --user="root" -t noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh
-    check_status "Falha ao executar o comando de geração de chaves no container noharm-nifi"
+    # Executando o comando para exibir configurações de segurança no nifi.properties
+    echo "### Exibindo configurações de segurança do arquivo nifi.properties..."
+    docker exec --user="root" -it noharm-nifi /bin/bash -c "cat ./conf/nifi.properties | grep security && exit"
 
-    # Modify renew_cert.sh after the containers are up
-    modify_renew_cert_script
+    # Reiniciando o container noharm-nifi após exibir as configurações de segurança
+    echo "### Reiniciando o serviço noharm-nifi para aplicar as configurações de segurança..."
+    docker restart noharm-nifi
+    check_status "Falha ao reiniciar o container noharm-nifi"
 
     # Reiniciando o container noharm-getname após modificar ssl_url
     echo "### Reiniciando o serviço noharm-getname para aplicar as modificações do ssl..."
@@ -251,29 +329,21 @@ main() {
 
     # Testa se os serviços estão funcionando corretamente
     test_services
+    finalize_and_restart_nifi
 
     echo "### Script executado com sucesso!"
-    
-    # Exibindo a senha somente no final após o sucesso
     echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
     echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
 
-    # Verificando se o arquivo noharm.env existe e exibindo seu conteúdo
     if [ -f "$ENV_FILE_PATH" ]; then
         echo "### Exibindo o conteúdo do arquivo noharm.env:"
         cat "$ENV_FILE_PATH"
     else
         echo "### Erro: Arquivo noharm.env não encontrado para exibição."
     fi
-
-    # Executando o comando para exibir configurações de segurança no nifi.properties
-    echo "### Exibindo configurações de segurança do arquivo nifi.properties..."
-    docker exec --user="root" -it noharm-nifi /bin/bash -c "cat ./conf/nifi.properties | grep security && exit"
-
-    # Reiniciando o container noharm-nifi após exibir as configurações de segurança
-    echo "### Reiniciando o serviço noharm-nifi para aplicar as configurações de segurança..."
-    docker restart noharm-nifi
-    check_status "Falha ao reiniciar o container noharm-nifi"
+   
+    echo "### Script executado com sucesso!"
+    
 }
 
 main "$@"
