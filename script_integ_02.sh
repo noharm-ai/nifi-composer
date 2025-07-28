@@ -39,7 +39,7 @@ clone_repository_and_generate_password() {
 remove_and_clone_repository() {
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Excluindo para garantir nova instalação..."
-        rm -rf nifi-composer  # Removendo completamente o diretório existente
+        sudo rm -rf nifi-composer  # Removendo completamente o diretório existente
         check_status "Falha ao remover a pasta 'nifi-composer'"
     fi
 
