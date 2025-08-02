@@ -1,9 +1,9 @@
 #!/bin/bash
 
-set -e
-
 # Definir o caminho absoluto para o arquivo noharm.env
 ENV_FILE_PATH="$(pwd)/nifi-composer/noharm.env"
+
+docker_compose_tempfile="docker-compose.temp.yml"
 
 # Função para verificar o status da execução
 check_status() {
@@ -13,46 +13,43 @@ check_status() {
     fi
 }
 
-# Função para remover a pasta nifi-composer com todas as tentativas possíveis
-remove_and_clone_repository() {
-    if [ -d "nifi-composer" ]; then
-        echo "### Pasta 'nifi-composer' já existe. Tentando remover para garantir nova instalação..."
-        ls -ld nifi-composer || true
-
-        rm -rf nifi-composer 2>/dev/null || true
-
-        if [ -d "nifi-composer" ]; then
-            echo "### Tentando remover com sudo..."
-            sudo rm -rf nifi-composer 2>/dev/null || true
-        fi
-
-        if [ -d "nifi-composer" ]; then
-            echo "### ERRO: Não foi possível remover a pasta 'nifi-composer'."
-            echo "### Rode o script como sudo OU remova manualmente:"
-            echo "      sudo rm -rf nifi-composer"
-            exit 1
-        fi
-    fi
-
-    clone_repository_and_generate_password
-    update_env_file
-    ln -sf "$ENV_FILE_PATH" nifi-composer/.env
-}
-
 # Função para clonar o repositório e gerar a senha para o usuário nifi_noharm
 clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
     git clone https://github.com/noharm-ai/nifi-composer/ || check_status "Falha ao clonar nifi-composer"
-
     cd nifi-composer/
     ./update_secrets.sh || check_status "Falha ao executar update_secrets.sh"
-
     [ ! -f "$ENV_FILE_PATH" ] && { echo "### Erro: noharm.env não encontrado após update_secrets.sh"; exit 1; }
     PASSWORD=$(grep "SINGLE_USER_CREDENTIALS_PASSWORD" "$ENV_FILE_PATH" | cut -d '=' -f2)
     cd ..
 }
 
-# Atualiza variáveis no noharm.env
+# Função para remover a pasta "nifi-composer" e recomeçar o processo
+remove_and_clone_repository() {
+    if [ -d "nifi-composer" ]; then
+        echo "### Pasta 'nifi-composer' já existe. Tentando remover para garantir nova instalação..."
+        sudo rm -rf nifi-composer
+        check_status "Falha ao remover a pasta 'nifi-composer'"
+    fi
+    clone_repository_and_generate_password
+}
+
+# Função para parar e remover containers, redes, volumes, e imagens
+cleanup_containers() {
+    echo "### Parando e removendo containers e volumes..."
+    if [ -f "nifi-composer/docker-compose.yml" ]; then
+        cd nifi-composer
+        docker compose down --volumes --remove-orphans
+        check_status "Falha ao parar e remover containers"
+        cd ..
+    else
+        echo "### Erro: docker-compose.yml não encontrado. Certifique-se de que o repositório foi clonado corretamente."
+        exit 1
+    fi
+}
+
+# Função para atualizar o arquivo de ambiente
+declare -A ENV_EXPORTS
 update_env_file() {
     echo "### Atualizando noharm.env..."
     [ ! -f "$ENV_FILE_PATH" ] && { echo "### Erro: noharm.env não encontrado"; exit 1; }
@@ -78,29 +75,90 @@ update_env_file() {
     echo "### noharm.env atualizado"
 }
 
-# Para e remove containers do ambiente
-cleanup_containers() {
-    echo "### Parando e removendo containers..."
-    cd nifi-composer
-    docker compose --env-file noharm.env down --volumes --remove-orphans || check_status "Falha no compose down"
-    cd ..
+# Compose temporário e primeira inicialização do Nifi
+create_compose_tempfile() {
+    echo "### Gerando docker-compose TEMPORÁRIO para a primeira subida do NiFi..."
+    cat > "$docker_compose_tempfile" <<EOF
+version: '3'
+services:
+  nifi:
+    container_name: "noharm-nifi"
+    image: apache/nifi:1.28.0
+    privileged: true
+    user: root
+    entrypoint: ["bash", "-c", "/opt/nifi/scripts/start.sh"]
+    env_file:
+      - ./nifi-composer/noharm.env
+    working_dir: "/opt/nifi/nifi-current"
+    ports:
+      - "8443:8443/tcp"
+    networks:
+      - default
+    labels:
+      maintainer: "NoHarm.ai <suporte@noharm.ai>"
+    ipc: "private"
+    restart: "no"
+networks:
+  default:
+    driver: bridge
+EOF
 }
 
-# Pull dos containers, com tentativas
-retry_docker_pull() {
-    for i in 1 2 3; do
-        echo "### Pull containers (tentativa $i)..."
-        cd nifi-composer
-        docker compose --env-file noharm.env up -d && { cd ..; return; }
-        cd ..
-        sleep $((i * 30))
+start_nifi_first_run() {
+    echo "### Subindo NiFi com compose TEMPORÁRIO (sem volumes externos)..."
+    docker compose -f "$docker_compose_tempfile" pull nifi
+    docker compose -f "$docker_compose_tempfile" up -d nifi
+}
+
+copy_dir_from_container_to_host() {
+    echo "### Copiando dados do container para ./nifi-data/"
+    mkdir -p nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
+    for p in conf database_repository flowfile_repository content_repository provenance_repository state logs; do
+        docker cp noharm-nifi:/opt/nifi/nifi-current/$p ./nifi-data/$p
     done
-    echo "### Erro: pull containers falhou"; exit 1
+    sudo chown -R 1000:1000 ./nifi-data
+    sudo chmod -R 700 ./nifi-data
+}
+
+remove_temp_compose_and_container() {
+    echo "### Removendo NiFi temporário..."
+    docker compose -f "$docker_compose_tempfile" down --remove-orphans
+    rm -f "$docker_compose_tempfile"
+}
+
+# Compose final
+declare -A FINAL_EXPORTS
+install_containers() {
+    echo "### Instalando containers com Docker Compose..."
+    update_env_file
+    docker compose pull
+    docker compose up -d
+}
+
+# Função para instalar o AWS CLI no container noharm-nifi
+install_aws_cli_in_nifi() {
+    container_name="noharm-nifi"
+    echo "### Instalando AWS CLI no container $container_name..."
+    docker exec --user="root" -it "$container_name" apt update
+    docker exec --user="root" -it "$container_name" apt install awscli wget -y
+    check_status "Falha ao instalar AWS CLI no container $container_name"
+}
+
+test_aws_cli_in_nifi() {
+    container_name="noharm-nifi"
+    echo "### Verificando se o AWS CLI está funcionando dentro do container $container_name..."
+    docker exec --user="root" -it "$container_name" /bin/bash -c "aws --version"
+    if [ $? -ne 0 ]; then
+        echo "### AWS CLI não está instalado no container $container_name. Tentando instalar..."
+        install_aws_cli_in_nifi
+    else
+        echo "### AWS CLI está instalado corretamente no container $container_name."
+    fi
 }
 
 wait_nifi_running() {
     echo "### Aguardando noharm-nifi ficar running..."
-    for i in {1..12}; do
+    for i in {1..24}; do
         if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi 2>/dev/null)" == "true" ]; then
             echo "### noharm-nifi está running"; return
         fi
@@ -110,9 +168,20 @@ wait_nifi_running() {
 }
 
 generate_and_configure_keys() {
-    wait_nifi_running
-    echo "### Gerando chave no nifi..."
-    docker exec --user=root noharm-nifi sh -c /opt/nifi/scripts/ext/genkeypair.sh || check_status "Erro genkeypair"
+    for attempt in 1 2 3; do
+        echo "### Gerando chaves no Nifi (tentativa $attempt)..."
+        if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
+            echo "### Chaves geradas com sucesso na tentativa $attempt."; break
+        fi
+        if [ "$attempt" -lt 3 ]; then
+            echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
+            docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
+            wait_nifi_running
+            sleep 15
+        else
+            check_status "Erro genkeypair após 3 tentativas"
+        fi
+    done
     modify_renew_cert_script
     docker restart noharm-getname || check_status "Erro restart getname"
 }
@@ -124,65 +193,88 @@ modify_renew_cert_script() {
     docker exec --user=root "$c" sed -i "s|SSL_URL=.*|SSL_URL=$GETNAME_SSL_URL|" /app/renew_cert.sh || check_status "Erro sed renew_cert"
 }
 
-test_aws_cli_in_nifi() {
-    echo "### Testando AWS CLI..."
-    docker exec --user=root noharm-nifi bash -c 'aws --version' || install_aws_cli_in_nifi
-}
-install_aws_cli_in_nifi() {
-    echo "### Instalando AWS CLI..."
-    docker exec --user=root noharm-nifi bash -c 'apt update && apt install awscli wget -y' || check_status "Erro install awscli"
-}
-
-test_services() {
-    echo "### Testando GetName..."
-    curl "https://$CLIENT_NAME.getname.noharm.ai/patient-name/$PATIENT_ID" || check_status "Erro GetName"
-}
-
 finalize_and_restart_nifi() {
-    echo "### Exibindo security configs..."
     docker exec --user=root noharm-nifi bash -c 'grep security ./conf/nifi.properties'
-    echo "### Reiniciando noharm-nifi..."
     docker restart noharm-nifi || check_status "Erro restart nifi"
 }
 
-prepare_volumes() {
-    echo "### Preparando volumes..."
-    mkdir -p nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
-    chown -R 1000:1000 nifi-data/; chmod -R 700 nifi-data
-}
-copy_dir_containers() {
-    echo "### Copiando dados do container..."
-    docker stop noharm-nifi
-    for p in conf database_repository flowfile_repository content_repository provenance_repository state logs; do
-        docker cp noharm-nifi:/opt/nifi/nifi-current/$p/ nifi-data/$p/
-    done
-}
-create_credentials_and_configure() {
-    echo "### Criando credenciais AWS..."
-    export $(grep -E '^AWS_' "$ENV_FILE_PATH" | xargs)
-    docker exec -u root noharm-nifi bash -c "echo 'accessKey=$AWS_ACCESS_KEY_ID' > /opt/nifi/nifi-current/aws_credentials && echo 'secretKey=$AWS_SECRET_ACCESS_KEY' >> /opt/nifi/nifi-current/aws_credentials && chown nifi:nifi /opt/nifi/nifi-current/aws_credentials && chmod 600 /opt/nifi/nifi-current/aws_credentials"
-    docker exec -u root noharm-nifi bash -c "mkdir -p /home/nifi/.aws && echo -e '[default]\nregion=$AWS_DEFAULT_REGION\noutput=json' > /home/nifi/.aws/config && echo -e '[default]\naws_access_key_id=$AWS_ACCESS_KEY_ID\naws_secret_access_key=$AWS_SECRET_ACCESS_KEY' > /home/nifi/.aws/credentials && chown -R nifi:nifi /home/nifi/.aws && chmod -R 700 /home/nifi/.aws"
+test_services() {
+    echo "### Verificando se o serviço está funcionando para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID..."
+    curl "https://$CLIENT_NAME.getname.noharm.ai/patient-name/$PATIENT_ID"
+    check_status "Falha ao verificar o serviço para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID"
 }
 
 # Função principal
 main() {
-    [ "$#" -lt 14 ] && { echo "Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <PATIENT_ID> <DB_MULTI_QUERY> <CLIENT_NAME>"; exit 1; }
-    REINSTALL_MODE=$1; AWS_ACCESS_KEY_ID=$2; AWS_SECRET_ACCESS_KEY=$3; GETNAME_SSL_URL=$4
-    DB_TYPE=$5; DB_HOST=$6; DB_DATABASE=$7; DB_PORT=$8; DB_USER=$9; DB_PASS=${10}
-    DB_QUERY=${11}; PATIENT_ID=${12}; DB_MULTI_QUERY=${13}; CLIENT_NAME=${14}
-
-    if [[ "$REINSTALL_MODE" == "true" ]]; then
-        remove_and_clone_repository; cleanup_containers; retry_docker_pull
-    else
-        clone_repository_and_generate_password; retry_docker_pull
+    if [ "$#" -lt 15 ]; then
+        echo "### Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <PATIENT_ID> <DB_MULTI_QUERY> <IDS_PATIENT> <CLIENT_NAME> <BRANCH_GIT>"
+        exit 1
     fi
 
-    generate_and_configure_keys; test_aws_cli_in_nifi; test_services; finalize_and_restart_nifi
+    REINSTALL_MODE=$1
+    AWS_ACCESS_KEY_ID=$2
+    AWS_SECRET_ACCESS_KEY=$3
+    GETNAME_SSL_URL=$4
+    DB_TYPE=$5
+    DB_HOST=$6
+    DB_DATABASE=$7
+    DB_PORT=$8
+    DB_USER=$9
+    DB_PASS=${10}
+    DB_QUERY=${11}
+    PATIENT_ID=${12}
+    DB_MULTI_QUERY=${13}
+    IDS_PATIENT=${14}
+    CLIENT_NAME=${15}
+    BRANCH_GIT=${16}
 
-    echo "### Script concluído. Senha: $PASSWORD"
-    cat "$ENV_FILE_PATH"
+    if [[ "$REINSTALL_MODE" == "true" ]]; then
+        remove_and_clone_repository
+        cleanup_containers
+        update_env_file
 
-    prepare_volumes; copy_dir_containers; create_credentials_and_configure; docker start noharm-nifi
+        # Primeira subida: docker-compose temporário só com Nifi, sem volumes externos
+        create_compose_tempfile
+        start_nifi_first_run
+        wait_nifi_running
+        copy_dir_from_container_to_host
+        remove_temp_compose_and_container
+
+        # Subida definitiva com volumes e stack final
+        install_containers
+    else
+        if [ ! "$(docker ps -q -f name=noharm-nifi)" ]; then
+            clone_repository_and_generate_password
+            install_containers
+        else
+            echo "### Container 'noharm-nifi' já está em execução. Pulando a reinstalação."
+        fi
+    fi
+
+    generate_and_configure_keys
+    echo "### Aguardando 1 minuto para garantir que o container noharm-nifi esteja totalmente iniciado..."
+    sleep 60
+    echo "### Exibindo configurações de segurança do arquivo nifi.properties..."
+    docker exec --user="root" -it noharm-nifi /bin/bash -c "cat ./conf/nifi.properties | grep security && exit"
+    echo "### Reiniciando o serviço noharm-nifi para aplicar as configurações de segurança..."
+    docker restart noharm-nifi
+    check_status "Falha ao reiniciar o container noharm-nifi"
+    echo "### Reiniciando o serviço noharm-getname para aplicar as modificações do ssl..."
+    docker restart noharm-getname
+    check_status "Falha ao reiniciar o container noharm-getname"
+    test_aws_cli_in_nifi
+    test_services
+    finalize_and_restart_nifi
+    echo "### Script executado com sucesso!"
+    echo "### Senha gerada para o usuário 'nifi_noharm': $PASSWORD"
+    echo "### Por favor, coloque essa senha no '1password', com o usuário 'nifi_noharm', dentro da seção 'Nifi server'."
+    if [ -f "$ENV_FILE_PATH" ]; then
+        echo "### Exibindo o conteúdo do arquivo noharm.env:"
+        cat "$ENV_FILE_PATH"
+    else
+        echo "### Erro: Arquivo noharm.env não encontrado para exibição."
+    fi
+    echo "### Script executado com sucesso!"
 }
 
 main "$@"
