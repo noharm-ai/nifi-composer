@@ -76,7 +76,7 @@ services:
     image: apache/nifi:1.28.0
     privileged: true
     user: root
-    entrypoint: ["bash", "-c", "/opt/nifi/scripts/start.sh"]
+    entrypoint: ["bash", "-c", "apt-get update && apt-get install -y wget && /opt/nifi/scripts/start.sh"]
     env_file:
       - ./nifi-composer/noharm.env
     working_dir: "/opt/nifi/nifi-current"
@@ -84,9 +84,6 @@ services:
       - "8443:8443/tcp"
     networks:
       - default
-    environment:
-      - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-      - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
     labels:
       maintainer: "NoHarm.ai <suporte@noharm.ai>"
     ipc: "private"
@@ -105,12 +102,12 @@ start_nifi_first_run() {
 
 copy_dir_from_container_to_host() {
     echo "### Copiando dados do container para ./nifi-data/"
-    mkdir -p nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
+    mkdir -p nifi-composer/nifi-data/{conf,database_repository,flowfile_repository,content_repository,provenance_repository,state,logs}
     for p in conf database_repository flowfile_repository content_repository provenance_repository state logs; do
-        docker cp noharm-nifi:/opt/nifi/nifi-current/$p ./nifi-data/$p
+        docker cp noharm-nifi:/opt/nifi/nifi-current/$p ./nifi-composer/nifi-data/$p
     done
-    sudo chown -R 1000:1000 ./nifi-data
-    sudo chmod -R 700 ./nifi-data
+    sudo chown -R 1000:1000 ./nifi-composer/nifi-data
+    sudo chmod -R 700 ./nifi-composer/nifi-data
 }
 
 remove_temp_compose_and_container() {
@@ -129,8 +126,8 @@ install_containers() {
 install_aws_cli_in_nifi() {
     container_name="noharm-nifi"
     echo "### Instalando AWS CLI no container $container_name..."
-    docker exec --user="root" -it "$container_name" apt update
-    docker exec --user="root" -it "$container_name" apt install awscli wget -y
+    docker exec --user="root" -it "$container_name" apt-get update
+    docker exec --user="root" -it "$container_name" apt-get install awscli wget -y
     check_status "Falha ao instalar AWS CLI no container $container_name"
 }
 
@@ -150,7 +147,10 @@ wait_nifi_running() {
     echo "### Aguardando noharm-nifi ficar running..."
     for i in {1..24}; do
         if [ "$(docker inspect -f '{{.State.Running}}' noharm-nifi 2>/dev/null)" == "true" ]; then
-            echo "### noharm-nifi está running"; return
+            echo "### noharm-nifi está running"
+            # Adicional: Permissão correta dentro do container
+            docker exec --user=root noharm-nifi chown -R nifi:nifi /opt/nifi/nifi-current
+            return
         fi
         echo "### Ainda não está running, aguardando 5s..."; sleep 5
     done
@@ -160,14 +160,15 @@ wait_nifi_running() {
 generate_and_configure_keys() {
     for attempt in 1 2 3; do
         echo "### Gerando chaves no Nifi (tentativa $attempt)..."
+        docker exec --user=root noharm-nifi chown -R nifi:nifi /opt/nifi/nifi-current
         if docker exec --user=root noharm-nifi /opt/nifi/scripts/ext/genkeypair.sh; then
             echo "### Chaves geradas com sucesso na tentativa $attempt."; break
         fi
         if [ "$attempt" -lt 3 ]; then
-            echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 15s antes do retry..."
+            echo "### Falha na tentativa $attempt, reiniciando Nifi e aguardando 20s antes do retry..."
             docker restart noharm-nifi || check_status "Erro reiniciando Nifi na tentativa $attempt"
             wait_nifi_running
-            sleep 15
+            sleep 20
         else
             check_status "Erro genkeypair após 3 tentativas"
         fi
@@ -217,6 +218,9 @@ main() {
     CLIENT_NAME=${15}
     BRANCH_GIT=${16}
 
+    export AWS_ACCESS_KEY_ID
+    export AWS_SECRET_ACCESS_KEY
+
     if [[ "$REINSTALL_MODE" == "true" ]]; then
         remove_and_clone_repository
         cleanup_containers
@@ -236,9 +240,10 @@ main() {
         fi
     fi
 
-    generate_and_configure_keys
-    echo "### Aguardando 1 minuto para garantir que o container noharm-nifi esteja totalmente iniciado..."
+    echo "### Esperando 60 segundos para garantir que o NiFi terminou de iniciar..."
     sleep 60
+
+    generate_and_configure_keys
     echo "### Exibindo configurações de segurança do arquivo nifi.properties..."
     docker exec --user="root" -it noharm-nifi /bin/bash -c "cat ./conf/nifi.properties | grep security && exit"
     echo "### Reiniciando o serviço noharm-nifi para aplicar as configurações de segurança..."
