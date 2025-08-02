@@ -1,11 +1,17 @@
 #!/bin/bash
 
+# Lembrete para o usuário exportar variáveis se quiser sumir os avisos do Compose
+if [[ -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" ]]; then
+    echo -e "\e[33m[AVISO] Recomenda-se exportar AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY para evitar avisos do Docker Compose.\e[0m"
+    echo -e "Exemplo: export AWS_ACCESS_KEY_ID=xxxx; export AWS_SECRET_ACCESS_KEY=yyyy"
+    echo -e "Ou rode o script assim: AWS_ACCESS_KEY_ID=xxxx AWS_SECRET_ACCESS_KEY=yyyy bash script_integ_02.sh ...\n"
+fi
+
 # Definir o caminho absoluto para o arquivo noharm.env
 ENV_FILE_PATH="$(pwd)/nifi-composer/noharm.env"
 
 docker_compose_tempfile="docker-compose.temp.yml"
 
-# Função para verificar o status da execução
 check_status() {
     if [ $? -ne 0 ]; then
         echo "### Erro: $1. O script precisa ser reexecutado."
@@ -13,7 +19,6 @@ check_status() {
     fi
 }
 
-# Função para clonar o repositório e gerar a senha para o usuário nifi_noharm
 clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
     git clone https://github.com/noharm-ai/nifi-composer/ || check_status "Falha ao clonar nifi-composer"
@@ -24,7 +29,6 @@ clone_repository_and_generate_password() {
     cd ..
 }
 
-# Função para remover a pasta "nifi-composer" e recomeçar o processo
 remove_and_clone_repository() {
     if [ -d "nifi-composer" ]; then
         echo "### Pasta 'nifi-composer' já existe. Tentando remover para garantir nova instalação..."
@@ -34,7 +38,6 @@ remove_and_clone_repository() {
     clone_repository_and_generate_password
 }
 
-# Função para parar e remover containers, redes, volumes, e imagens
 cleanup_containers() {
     echo "### Parando e removendo containers e volumes..."
     if [ -f "nifi-composer/docker-compose.yml" ]; then
@@ -48,7 +51,6 @@ cleanup_containers() {
     fi
 }
 
-# Função para atualizar o arquivo de ambiente
 update_env_file() {
     echo "### Atualizando noharm.env..."
     [ ! -f "$ENV_FILE_PATH" ] && { echo "### Erro: noharm.env não encontrado"; exit 1; }
@@ -77,7 +79,6 @@ update_env_file() {
 create_compose_tempfile() {
     echo "### Gerando docker-compose TEMPORÁRIO para a primeira subida do NiFi..."
     cat > "$docker_compose_tempfile" <<EOF
-version: '3'
 services:
   nifi:
     container_name: "noharm-nifi"
