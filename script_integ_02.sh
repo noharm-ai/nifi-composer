@@ -49,7 +49,6 @@ cleanup_containers() {
 }
 
 # Função para atualizar o arquivo de ambiente
-declare -A ENV_EXPORTS
 update_env_file() {
     echo "### Atualizando noharm.env..."
     [ ! -f "$ENV_FILE_PATH" ] && { echo "### Erro: noharm.env não encontrado"; exit 1; }
@@ -75,7 +74,6 @@ update_env_file() {
     echo "### noharm.env atualizado"
 }
 
-# Compose temporário e primeira inicialização do Nifi
 create_compose_tempfile() {
     echo "### Gerando docker-compose TEMPORÁRIO para a primeira subida do NiFi..."
     cat > "$docker_compose_tempfile" <<EOF
@@ -126,8 +124,6 @@ remove_temp_compose_and_container() {
     rm -f "$docker_compose_tempfile"
 }
 
-# Compose final
-declare -A FINAL_EXPORTS
 install_containers() {
     echo "### Instalando containers com Docker Compose..."
     update_env_file
@@ -135,7 +131,6 @@ install_containers() {
     docker compose up -d
 }
 
-# Função para instalar o AWS CLI no container noharm-nifi
 install_aws_cli_in_nifi() {
     container_name="noharm-nifi"
     echo "### Instalando AWS CLI no container $container_name..."
@@ -204,7 +199,6 @@ test_services() {
     check_status "Falha ao verificar o serviço para o cliente $CLIENT_NAME com o código de paciente $PATIENT_ID"
 }
 
-# Função principal
 main() {
     if [ "$#" -lt 15 ]; then
         echo "### Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <PATIENT_ID> <DB_MULTI_QUERY> <IDS_PATIENT> <CLIENT_NAME> <BRANCH_GIT>"
@@ -232,15 +226,11 @@ main() {
         remove_and_clone_repository
         cleanup_containers
         update_env_file
-
-        # Primeira subida: docker-compose temporário só com Nifi, sem volumes externos
         create_compose_tempfile
         start_nifi_first_run
         wait_nifi_running
         copy_dir_from_container_to_host
         remove_temp_compose_and_container
-
-        # Subida definitiva com volumes e stack final
         install_containers
     else
         if [ ! "$(docker ps -q -f name=noharm-nifi)" ]; then
