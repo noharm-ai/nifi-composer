@@ -10,12 +10,6 @@ check_status() {
     fi
 }
 
-get_env_from_file() {
-    [ ! -f "$ENV_FILE_PATH" ] && { echo "### Erro: noharm.env não encontrado"; exit 1; }
-    AWS_ACCESS_KEY_ID=$(grep '^AWS_ACCESS_KEY_ID=' "$ENV_FILE_PATH" | cut -d '=' -f2-)
-    AWS_SECRET_ACCESS_KEY=$(grep '^AWS_SECRET_ACCESS_KEY=' "$ENV_FILE_PATH" | cut -d '=' -f2-)
-}
-
 clone_repository_and_generate_password() {
     echo "### Clonando o repositório e gerando senha para o usuário nifi_noharm..."
     git clone https://github.com/noharm-ai/nifi-composer/ || check_status "Falha ao clonar nifi-composer"
@@ -51,6 +45,8 @@ cleanup_containers() {
 update_env_file() {
     echo "### Atualizando noharm.env..."
     [ ! -f "$ENV_FILE_PATH" ] && { echo "### Erro: noharm.env não encontrado"; exit 1; }
+    sed -i "s|^AWS_ACCESS_KEY_ID=.*|AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID|" "$ENV_FILE_PATH"
+    sed -i "s|^AWS_SECRET_ACCESS_KEY=.*|AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY|" "$ENV_FILE_PATH"
     sed -i "s|^GETNAME_SSL_URL=.*|GETNAME_SSL_URL=$GETNAME_SSL_URL|" "$ENV_FILE_PATH"
     sed -i "s|^DB_TYPE=.*|DB_TYPE=$DB_TYPE|" "$ENV_FILE_PATH"
     sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" "$ENV_FILE_PATH"
@@ -88,6 +84,9 @@ services:
       - "8443:8443/tcp"
     networks:
       - default
+    environment:
+      - AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
     labels:
       maintainer: "NoHarm.ai <suporte@noharm.ai>"
     ipc: "private"
@@ -196,27 +195,27 @@ test_services() {
 }
 
 main() {
-    if [ "$#" -lt 13 ]; then
-        echo "### Uso: $0 <REINSTALL_MODE> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <PATIENT_ID> <DB_MULTI_QUERY> <IDS_PATIENT> <CLIENT_NAME> <BRANCH_GIT>"
+    if [ "$#" -lt 15 ]; then
+        echo "### Uso: $0 <REINSTALL_MODE> <AWS_ACCESS_KEY_ID> <AWS_SECRET_ACCESS_KEY> <GETNAME_SSL_URL> <DB_TYPE> <DB_HOST> <DB_DATABASE> <DB_PORT> <DB_USER> <DB_PASS> <DB_QUERY> <PATIENT_ID> <DB_MULTI_QUERY> <IDS_PATIENT> <CLIENT_NAME> <BRANCH_GIT>"
         exit 1
     fi
 
     REINSTALL_MODE=$1
-    GETNAME_SSL_URL=$2
-    DB_TYPE=$3
-    DB_HOST=$4
-    DB_DATABASE=$5
-    DB_PORT=$6
-    DB_USER=$7
-    DB_PASS=$8
-    DB_QUERY=$9
-    PATIENT_ID=${10}
-    DB_MULTI_QUERY=${11}
-    IDS_PATIENT=${12}
-    CLIENT_NAME=${13}
-    BRANCH_GIT=${14}
-
-    get_env_from_file
+    AWS_ACCESS_KEY_ID=$2
+    AWS_SECRET_ACCESS_KEY=$3
+    GETNAME_SSL_URL=$4
+    DB_TYPE=$5
+    DB_HOST=$6
+    DB_DATABASE=$7
+    DB_PORT=$8
+    DB_USER=$9
+    DB_PASS=${10}
+    DB_QUERY=${11}
+    PATIENT_ID=${12}
+    DB_MULTI_QUERY=${13}
+    IDS_PATIENT=${14}
+    CLIENT_NAME=${15}
+    BRANCH_GIT=${16}
 
     if [[ "$REINSTALL_MODE" == "true" ]]; then
         remove_and_clone_repository
