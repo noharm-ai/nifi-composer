@@ -1,21 +1,39 @@
+version: "3.9"
+
 networks:
-    noharm-net:
-      name: noharm-net
-      ipam:
-        driver: default
-        config: 
-          - subnet: "172.19.0.0/16"
+  noharm-net:
+    name: noharm-net
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.19.0.0/16"
+
 services:
- nifi:
+  nifi:
     container_name: "noharm-nifi"
     hostname: "noharm-nifi"
-    image: "apache/nifi:1.28.1"
-    entrypoint: ["bash", "-c", "/opt/nifi/scripts/ext/update_nifi.sh; /opt/nifi/scripts/start.sh"]
+    image: "apache/nifi:2.0.0"
+    # Mantém tua rotina opcional de pré-start (se existir):
+    # Coloque o script em ./nifi/scripts/ext/update_nifi.sh
+    entrypoint: ["bash", "-lc", "if [ -x /opt/nifi/scripts/ext/update_nifi.sh ]; then /opt/nifi/scripts/ext/update_nifi.sh; fi; /opt/nifi/scripts/start.sh"]
     env_file:
       - ./noharm.env
+    environment:
+      # NiFi single-user (DEV) — reusa as tuas vars
+      - SINGLE_USER_CREDENTIALS_USERNAME=${SINGLE_USER_CREDENTIALS_USERNAME}
+      - SINGLE_USER_CREDENTIALS_PASSWORD=${SINGLE_USER_CREDENTIALS_PASSWORD}
+      - NIFI_WEB_HTTPS_PORT=${NIFI_WEB_HTTPS_PORT}
+      - NIFI_JVM_HEAP_INIT=${NIFI_JVM_HEAP_INIT}
+      - NIFI_JVM_HEAP_MAX=${NIFI_JVM_HEAP_MAX}
+      # AWS creds disponíveis nos processors/scripts (se usados)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      # URL interna do Registry (para versionamento)
+      - NIFI_REGISTRY_URL=${NIFI_REGISTRY_URL:-http://nifi-registry:18080}
     ipc: "private"
     labels:
-        maintainer: "NoHarm.ai <suporte@noharm.ai>"
+      maintainer: "NoHarm.ai <suporte@noharm.ai>"
     logging:
       driver: "json-file"
       options:
@@ -24,18 +42,64 @@ services:
       noharm-net:
         ipv4_address: 172.19.0.2
     ports:
-      - "8443:8443/tcp"
+      - "${NIFI_WEB_HTTPS_PORT:-8443}:8443/tcp"
     restart: "always"
     user: "nifi"
     working_dir: "/opt/nifi/nifi-current"
+    depends_on:
+      - nifi-registry
     volumes:
-      - ./:/opt/nifi/scripts/ext/
- myanony:
+      # Persistência completa do NiFi 2.0
+      - ./nifi/conf:/opt/nifi/nifi-current/conf
+      - ./nifi/state:/opt/nifi/nifi-current/state
+      - ./nifi/database_repository:/opt/nifi/nifi-current/database_repository
+      - ./nifi/flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - ./nifi/content_repository:/opt/nifi/nifi-current/content_repository
+      - ./nifi/provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - ./nifi/logs:/opt/nifi/nifi-current/logs
+      # Extras úteis
+      - ./nifi/drivers:/opt/nifi/drivers
+      - ./nifi/certs:/opt/nifi/certs
+      - ./nifi/scripts:/opt/nifi/scripts
+      # Compat com teu padrão anterior (scripts externos)
+      - ./nifi/scripts/ext:/opt/nifi/scripts/ext
+
+  nifi-registry:
+    container_name: "nifi-registry"
+    hostname: "nifi-registry"
+    image: "apache/nifi-registry:latest"
+    env_file:
+      - ./noharm.env
+    environment:
+      # Mesmas credenciais single-user (DEV)
+      - SINGLE_USER_CREDENTIALS_USERNAME=${SINGLE_USER_CREDENTIALS_USERNAME}
+      - SINGLE_USER_CREDENTIALS_PASSWORD=${SINGLE_USER_CREDENTIALS_PASSWORD}
+      - NIFI_REGISTRY_WEB_HTTP_PORT=${REGISTRY_HTTP_PORT:-18080}
+    ipc: "private"
+    labels:
+      maintainer: "NoHarm.ai <suporte@noharm.ai>"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+    networks:
+      noharm-net:
+        ipv4_address: 172.19.0.5
+    ports:
+      - "${REGISTRY_HTTP_PORT:-18080}:18080/tcp"
+    restart: "always"
+    volumes:
+      - ./nifi-registry/conf:/opt/nifi-registry/nifi-registry-current/conf
+      - ./nifi-registry/database:/opt/nifi-registry/nifi-registry-current/database
+      - ./nifi-registry/flow_storage:/opt/nifi-registry/nifi-registry-current/flow_storage
+      - ./nifi-registry/logs:/opt/nifi-registry/nifi-registry-current/logs
+
+  myanony:
     container_name: "noharm-anony"
     hostname: "noharm-anony"
     image: "noharm/anony:latest"
     env_file:
-      - ./noharm.env    
+      - ./noharm.env
     ipc: "private"
     labels:
       maintainer: "NoHarm.ai <suporte@noharm.ai>"
@@ -50,13 +114,14 @@ services:
       - "80:80/tcp"
     restart: "always"
     working_dir: "/app"
- mygetname:
+
+  mygetname:
     container_name: "noharm-getname"
     hostname: "noharm-getname"
     image: "noharm/getname:latest"
     entrypoint: ["bash", "-c", "/app/scripts/renew_cert.sh; /start.sh"]
     env_file:
-      - ./noharm.env    
+      - ./noharm.env
     ipc: "private"
     labels:
       maintainer: "NoHarm.ai <suporte@noharm.ai>"
@@ -72,5 +137,4 @@ services:
     restart: "always"
     working_dir: "/app"
     volumes:
-
-      - ./:/app/scripts/
+      - ./getname-scripts:/app/scripts:ro
