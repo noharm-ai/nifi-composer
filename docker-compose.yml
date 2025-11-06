@@ -1,0 +1,76 @@
+networks:
+    noharm-net:
+      name: noharm-net
+      ipam:
+        driver: default
+        config: 
+          - subnet: "172.19.0.0/16"
+services:
+ nifi:
+    container_name: "noharm-nifi"
+    hostname: "noharm-nifi"
+    image: "apache/nifi:1.28.1"
+    entrypoint: ["bash", "-c", "/opt/nifi/scripts/ext/update_nifi.sh; /opt/nifi/scripts/start.sh"]
+    env_file:
+      - ./noharm.env
+    ipc: "private"
+    labels:
+        maintainer: "NoHarm.ai <suporte@noharm.ai>"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+    networks:
+      noharm-net:
+        ipv4_address: 172.19.0.2
+    ports:
+      - "8443:8443/tcp"
+    restart: "always"
+    user: "nifi"
+    working_dir: "/opt/nifi/nifi-current"
+    volumes:
+      - ./:/opt/nifi/scripts/ext/
+ myanony:
+    container_name: "noharm-anony"
+    hostname: "noharm-anony"
+    image: "noharm/anony:latest"
+    env_file:
+      - ./noharm.env    
+    ipc: "private"
+    labels:
+      maintainer: "NoHarm.ai <suporte@noharm.ai>"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+    networks:
+      noharm-net:
+        ipv4_address: 172.19.0.3
+    ports:
+      - "80:80/tcp"
+    restart: "always"
+    working_dir: "/app"
+ mygetname:
+    container_name: "noharm-getname"
+    hostname: "noharm-getname"
+    image: "noharm/getname:latest"
+    entrypoint: ["bash", "-c", "/app/scripts/renew_cert.sh; /start.sh"]
+    env_file:
+      - ./noharm.env    
+    ipc: "private"
+    labels:
+      maintainer: "NoHarm.ai <suporte@noharm.ai>"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+    networks:
+      noharm-net:
+        ipv4_address: 172.19.0.4
+    ports:
+      - "443:443/tcp"
+    restart: "always"
+    working_dir: "/app"
+    volumes:
+
+      - ./:/app/scripts/
