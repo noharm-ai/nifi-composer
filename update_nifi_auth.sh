@@ -57,10 +57,10 @@ backup_flow() {
     log "Aviso: Nenhum arquivo de flow encontrado (flow.xml.gz ou flow.json.gz)"
   
   # Backup dos repositórios
-  docker cp "${container}:/opt/nifi/nifi-current/state" "$backup_local/" 2>/dev/null || true
-  docker cp "${container}:/opt/nifi/nifi-current/database_repository" "$backup_local/" 2>/dev/null || true
-  docker cp "${container}:/opt/nifi/nifi-current/flowfile_repository" "$backup_local/" 2>/dev/null || true
-  docker cp "${container}:/opt/nifi/nifi-current/content_repository" "$backup_local/" 2>/dev/null || true
+  # docker cp "${container}:/opt/nifi/nifi-current/state" "$backup_local/" 2>/dev/null || true
+  # docker cp "${container}:/opt/nifi/nifi-current/database_repository" "$backup_local/" 2>/dev/null || true
+  # docker cp "${container}:/opt/nifi/nifi-current/flowfile_repository" "$backup_local/" 2>/dev/null || true
+  # docker cp "${container}:/opt/nifi/nifi-current/content_repository" "$backup_local/" 2>/dev/null || true
   
   log "Backup do flow salvo em: $backup_local"
   echo "$backup_local"
