@@ -75,8 +75,14 @@ echo "==========================================="
 echo "1 - Ativar login com o Google (OIDC)"
 echo "2 - Reverter backup de configurações"
 echo "3 - Criar novo usuário"
+echo "==========================================="
+echo "                  DEBUG                    "
+echo "==========================================="
+echo "Opções disponíveis:"
+echo " 4 - Buscar UUID do root process group"
+echo "==========================================="
 echo "-------------------------------------------"
-read -rp "Escolha uma opção (1, 2 ou 3): " OPCAO
+read -rp "Escolha uma opção (1, 2, 3 ou 4): " OPCAO
 echo "-------------------------------------------"
 
 if [ "$OPCAO" == "1" ]; then
@@ -261,22 +267,21 @@ if [ "$OPCAO" == "1" ]; then
   echo "🔍 Obtendo UUID do root process group..."
   ROOT_PG_ID=""
 
-  # Tentativa 1: Procurar em flow.json.gz
+  # Procurar em flow.json.gz
   if docker exec "$CONTAINER_NAME" bash -c "test -f /opt/nifi/nifi-current/conf/flow.json.gz"; then
       echo "✅ Encontrado flow.json.gz, extraindo UUID..."
-      ROOT_PG_ID=$(docker exec "$CONTAINER_NAME" bash -c "zcat /opt/nifi/nifi-current/conf/flow.json.gz 2>/dev/null | grep -o '\"instanceIdentifier\":\"[^\"]*' | head -1 | cut -d'\"' -f4" | head -1)
-  fi
-
-  # Tentativa 2: Procurar em flow.xml.gz
-  if [[ -z "$ROOT_PG_ID" ]] && docker exec "$CONTAINER_NAME" bash -c "test -f /opt/nifi/nifi-current/conf/flow.xml.gz"; then
-      echo "✅ Encontrado flow.xml.gz, extraindo UUID..."
-      ROOT_PG_ID=$(docker exec "$CONTAINER_NAME" bash -c "zcat /opt/nifi/nifi-current/conf/flow.xml.gz 2>/dev/null | grep -o 'instanceIdentifier=\"[^\"]*' | head -1 | cut -d'\"' -f2" | head -1)
-  fi
-
-  # Tentativa 3: Procurar qualquer arquivo de flow
-  if [[ -z "$ROOT_PG_ID" ]]; then
-      echo "🔍 Procurando em qualquer arquivo de flow..."
-      ROOT_PG_ID=$(docker exec "$CONTAINER_NAME" bash -c "find /opt/nifi/nifi-current/conf -name '*flow*' -type f | head -1 | xargs -I {} sh -c 'if echo {} | grep -q \".gz\"; then zcat {} 2>/dev/null; else cat {} 2>/dev/null; fi' | grep -o -E '(instanceIdentifier=\"[^\"]*|\"instanceIdentifier\":\"[^\"]*)' | head -1 | cut -d'\"' -f2" | head -1)
+      ROOT_PG_ID=$(
+        docker exec "$CONTAINER_NAME" bash -c '
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          jq -r ".rootGroup.instanceIdentifier" 2>/dev/null || 
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          grep -A 10 "\"rootGroup\"" |
+          grep "\"instanceIdentifier\"" |
+          head -1 |
+          grep -o "\"instanceIdentifier\":\"[^\"]*\"" |
+          cut -d"\"" -f4
+        '
+      )
   fi
 
   # Se ainda não encontrou, usar fallback
@@ -492,16 +497,39 @@ elif [ "$OPCAO" == "3" ]; then
   echo ""
   echo "⚠️  Para ativar, o container será reiniciado agora."
 
+elif [ "$OPCAO" == "4" ]; then
+  echo "🔍 Obtendo UUID do root process group..."
+  ROOT_PG_ID=""
+
+  # Procurar em flow.json.gz
+  if docker exec "$CONTAINER_NAME" bash -c "test -f /opt/nifi/nifi-current/conf/flow.json.gz"; then
+      echo "✅ Encontrado flow.json.gz, extraindo UUID..."
+      ROOT_PG_ID=$(
+        docker exec "$CONTAINER_NAME" bash -c '
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          jq -r ".rootGroup.instanceIdentifier" 2>/dev/null || 
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          grep -A 10 "\"rootGroup\"" |
+          grep "\"instanceIdentifier\"" |
+          head -1 |
+          grep -o "\"instanceIdentifier\":\"[^\"]*\"" |
+          cut -d"\"" -f4
+        '
+      )
+      echo "✅ UUID do root process group encontrado: $ROOT_PG_ID"
+  else
+      echo "⚠️ flow.json.gz não encontrado."
+  fi
 else
   echo "❌ Opção inválida."
   exit 1
 fi
 
 echo ""
-echo "==========================================="
 
 # Verifica se uma operação que requer reinício foi executada
 if [[ "$OPCAO" == "1" || "$OPCAO" == "3" ]]; then
+  echo "==========================================="
   read -rp "🔄 Deseja REINICIAR o container $CONTAINER_NAME agora? (s/n): " R
   if [[ "$R" =~ ^[sS]$ ]]; then
     log "🚀 REINICIANDO container..."
