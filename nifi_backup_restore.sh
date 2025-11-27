@@ -15,17 +15,6 @@ BKUP_DIR="$CONF_DIR/bkp"
 AWS_S3_BUCKET="s3://noharm-nifi"
 NOME_CLIENTE="$1"
 
-# Executar com root e verificar/instalar nano
-echo "Executando como root e verificando instalação do nano..."
-docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
-  if ! command -v nano &> /dev/null; then
-    echo 'Nano não está instalado. Instalando...'
-    apt-get update && apt-get install nano -y
-  else
-    echo 'Nano já está instalado.'
-  fi
-"
-
 # Verificar se o AWS CLI está instalado e instalar caso necessário
 docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "aws --version" &>/dev/null
 if [[ $? -ne 0 ]]; then
