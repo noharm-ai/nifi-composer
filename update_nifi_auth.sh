@@ -79,10 +79,11 @@ echo "==========================================="
 echo "                  DEBUG                    "
 echo "==========================================="
 echo "Opções disponíveis:"
-echo " 4 - Buscar UUID do root process group"
+echo " 4 - Buscar UUID do root process group e Input Port 'BulletinMonitor'"
+echo " 5 - Recriar somente as políticas (policies)"
 echo "==========================================="
 echo "-------------------------------------------"
-read -rp "Escolha uma opção (1, 2, 3 ou 4): " OPCAO
+read -rp "Escolha uma opção (1, 2, 3, 4 ou 5): " OPCAO
 echo "-------------------------------------------"
 
 if [ "$OPCAO" == "1" ]; then
@@ -268,6 +269,7 @@ if [ "$OPCAO" == "1" ]; then
   # Descobrir o UUID do root process group - MÉTODO SIMPLIFICADO
   echo "🔍 Obtendo UUID do root process group..."
   ROOT_PG_ID=""
+  IP_ID=""
 
   # Procurar em flow.json.gz
   if docker exec "$CONTAINER_NAME" bash -c "test -f /opt/nifi/nifi-current/conf/flow.json.gz"; then
@@ -284,7 +286,17 @@ if [ "$OPCAO" == "1" ]; then
           cut -d"\"" -f4
         '
       )
-      IP_ID="????"
+      IP_ID=$(
+        docker exec "$CONTAINER_NAME" bash -c '
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          jq -r "
+            .rootGroup.processGroups[]
+            | .inputPorts[]?
+            | select(.name == \"BulletinMonitor\")
+            | .instanceIdentifier
+          " 2>/dev/null
+        '
+      )
   fi
 
   # Se ainda não encontrou, usar fallback
@@ -300,6 +312,17 @@ if [ "$OPCAO" == "1" ]; then
       fi
   else
       echo "✅ UUID do root process group encontrado: $ROOT_PG_ID"
+  fi
+
+  if [[ -z "$IP_ID" ]]; then
+    echo "❌ Input Port 'BulletinMonitor' NÃO encontrada no flow.json.gz!"
+    echo "Você precisa confirmar se:
+          • Ela realmente está dentro de rootGroup.processGroups[i]
+          • O nome está EXATAMENTE 'BulletinMonitor'
+    "
+    exit 1
+  else
+    echo "✅ UUID do Input Port 'BulletinMonitor' encontrado: $IP_ID"
   fi
 
   # Função para gerar políticas de process group
@@ -330,13 +353,13 @@ if [ "$OPCAO" == "1" ]; then
             <group identifier="$GROUP_ID"/>
         </policy>
         <policy identifier="$IP1" resource="/policies/input-ports/$IP_ID" action="R">
-            <group identifier="noharm-admins-group"/>
+            <group identifier="$GROUP_ID"/>
         </policy>
         <policy identifier="$IP2" resource="/policies/input-ports/$IP_ID" action="W">
-            <group identifier="noharm-admins-group"/>
+            <group identifier="$GROUP_ID"/>
         </policy>
         <policy identifier="$IP3" resource="/data-transfer/input-ports/$IP_ID" action="W">
-            <group identifier="noharm-admins-group"/>
+            <group identifier="$GROUP_ID"/>
         </policy>
         
 EOF
@@ -517,6 +540,7 @@ elif [ "$OPCAO" == "3" ]; then
 elif [ "$OPCAO" == "4" ]; then
   echo "🔍 Obtendo UUID do root process group..."
   ROOT_PG_ID=""
+  IP_ID=""
 
   # Procurar em flow.json.gz
   if docker exec "$CONTAINER_NAME" bash -c "test -f /opt/nifi/nifi-current/conf/flow.json.gz"; then
@@ -533,10 +557,233 @@ elif [ "$OPCAO" == "4" ]; then
           cut -d"\"" -f4
         '
       )
+      IP_ID=$(
+        docker exec "$CONTAINER_NAME" bash -c '
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          jq -r "
+            .rootGroup.processGroups[]
+            | .inputPorts[]?
+            | select(.name == \"BulletinMonitor\")
+            | .instanceIdentifier
+          " 2>/dev/null
+        '
+      )
       echo "✅ UUID do root process group encontrado: $ROOT_PG_ID"
+      echo "✅ UUID do Input Port 'BulletinMonitor' encontrado: $IP_ID"
   else
       echo "⚠️ flow.json.gz não encontrado."
   fi
+elif [ "$OPCAO" == "5" ]; then
+  echo "🛡️  Recriando políticas de permissões..."
+  
+  # Fazer backup do flow ANTES de qualquer mudança
+  FLOW_BACKUP=$(backup_flow "$CONTAINER_NAME")
+  
+  echo "📦 Criando backup dos arquivos atuais..."
+  docker exec "$CONTAINER_NAME" bash -c "mkdir -p $BACKUP_DIR && cp $NIFI_CONF_DIR/{authorizations.xml,users.xml} $BACKUP_DIR/ 2>/dev/null || true"
+
+  # Obter o UUID do root process group
+  echo "🔍 Obtendo UUID do root process group..."
+  ROOT_PG_ID=""
+  IP_ID=""
+
+  # Procurar em flow.json.gz
+  if docker exec "$CONTAINER_NAME" bash -c "test -f /opt/nifi/nifi-current/conf/flow.json.gz"; then
+      echo "✅ Encontrado flow.json.gz, extraindo UUID..."
+      ROOT_PG_ID=$(
+        docker exec "$CONTAINER_NAME" bash -c '
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          jq -r ".rootGroup.instanceIdentifier" 2>/dev/null || 
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          grep -A 10 "\"rootGroup\"" |
+          grep "\"instanceIdentifier\"" |
+          head -1 |
+          grep -o "\"instanceIdentifier\":\"[^\"]*\"" |
+          cut -d"\"" -f4
+        '
+      )
+      IP_ID=$(
+        docker exec "$CONTAINER_NAME" bash -c '
+          zcat /opt/nifi/nifi-current/conf/flow.json.gz |
+          jq -r "
+            .rootGroup.processGroups[]
+            | .inputPorts[]?
+            | select(.name == \"BulletinMonitor\")
+            | .instanceIdentifier
+          " 2>/dev/null
+        '
+      )
+  fi
+
+  # Se não encontrou, pedir ao usuário
+  if [[ -z "$ROOT_PG_ID" ]]; then
+      echo "⚠️  Não foi possível obter o UUID do process group automaticamente"
+      read -rp "📝 Digite o UUID do root process group: " ROOT_PG_ID
+      
+      if [[ -z "$ROOT_PG_ID" ]]; then
+          echo "❌ UUID do root process group é obrigatório. Abortando."
+          exit 1
+      fi
+  else
+      echo "✅ UUID do root process group encontrado: $ROOT_PG_ID"
+  fi
+
+  if [[ -z "$IP_ID" ]]; then
+    echo "❌ Input Port 'BulletinMonitor' NÃO encontrada no flow.json.gz!"
+    echo "Você precisa confirmar se:
+          • Ela realmente está dentro de rootGroup.processGroups[i]
+          • O nome está EXATAMENTE 'BulletinMonitor'
+    "
+    exit 1
+  else
+    echo "✅ UUID do Input Port 'BulletinMonitor' encontrado: $IP_ID"
+  fi
+
+  # Extrair a lista de grupos do users.xml
+  echo "📋 Extraindo grupos e usuários existentes..."
+  EXISTING_GROUPS=$(docker exec "$CONTAINER_NAME" bash -c "
+    if test -f '$NIFI_CONF_DIR/users.xml'; then
+      grep -o 'identifier=\"[^\"]*\"' '$NIFI_CONF_DIR/users.xml' | 
+      grep 'group' | 
+      cut -d'\"' -f2 | 
+      head -1
+    fi
+  ")
+
+  # Se não encontrou grupos, usar o padrão
+  if [[ -z "$EXISTING_GROUPS" ]]; then
+    EXISTING_GROUPS="noharm-admins-group"
+    echo "⚠️  Nenhum grupo encontrado, usando grupo padrão: $EXISTING_GROUPS"
+  else
+    echo "✅ Grupos encontrados: $EXISTING_GROUPS"
+  fi
+
+  # Função para gerar políticas de process group
+  generate_pg_policies() {
+    local PG_UUID="$1"
+    local GROUP_ID="$2"
+    local IP_ID="$3"
+
+    local P1=$(generate_uuid)
+    local P2=$(generate_uuid)
+    local P3=$(generate_uuid)
+    local P4=$(generate_uuid)
+    local IP1=$(generate_uuid)
+    local IP2=$(generate_uuid)
+    local IP3=$(generate_uuid)
+
+    cat <<EOF
+        <policy identifier="$P1" resource="/process-groups/$PG_UUID" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$P2" resource="/process-groups/$PG_UUID" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$P3" resource="/data/process-groups/$PG_UUID" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$P4" resource="/data/process-groups/$PG_UUID" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$IP1" resource="/policies/input-ports/$IP_ID" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$IP2" resource="/policies/input-ports/$IP_ID" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$IP3" resource="/data-transfer/input-ports/$IP_ID" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+EOF
+  }
+
+  # Função para gerar políticas globais
+  generate_global_policies() {
+    local GROUP_ID="$1"
+
+    cat <<EOF
+        <policy identifier="$(generate_uuid)" resource="/flow" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/restricted-components" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/tenants" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/tenants" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/policies" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/policies" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/controller" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/controller" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/proxy" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/provenance" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/site-to-site" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/system" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/counters" action="R">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+        <policy identifier="$(generate_uuid)" resource="/counters" action="W">
+            <group identifier="$GROUP_ID"/>
+        </policy>
+EOF
+  }
+
+  # Criar o novo authorizations.xml
+  echo "📝 Criando novo authorizations.xml..."
+
+  AUTHORIZATIONS_XML='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<authorizations>
+    <policies>'
+
+  # Adicionar políticas globais para cada grupo
+  for group in $EXISTING_GROUPS; do
+    AUTHORIZATIONS_XML="${AUTHORIZATIONS_XML}
+$(generate_global_policies "$group")"
+  done
+
+  # Adicionar políticas de process group para cada grupo
+  for group in $EXISTING_GROUPS; do
+    AUTHORIZATIONS_XML="${AUTHORIZATIONS_XML}
+$(generate_pg_policies "$ROOT_PG_ID" "$group" "$IP_ID")"
+  done
+
+  AUTHORIZATIONS_XML="${AUTHORIZATIONS_XML}
+    </policies>
+</authorizations>"
+
+  # Escrever o novo arquivo authorizations.xml
+  echo "$AUTHORIZATIONS_XML" | docker exec -i "$CONTAINER_NAME" bash -c "cat > $NIFI_CONF_DIR/authorizations.xml"
+
+  if ! docker exec "$CONTAINER_NAME" bash -c "test -s $NIFI_CONF_DIR/authorizations.xml"; then
+    echo "❌ ERRO: Não foi possível criar o arquivo authorizations.xml"
+    exit 1
+  fi
+
+  echo "✅ Políticas recriadas com sucesso!"
+  echo "📋 Resumo:"
+  echo "   - UUID do process group: $ROOT_PG_ID"
+  echo "   - Grupos configurados: $EXISTING_GROUPS"
+  echo "   - Backup salvo em: $BACKUP_DIR"
+  echo "   - Backup do flow salvo em: $FLOW_BACKUP"
 else
   echo "❌ Opção inválida."
   exit 1
