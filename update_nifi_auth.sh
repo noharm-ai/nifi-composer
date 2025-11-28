@@ -113,6 +113,7 @@ if [ "$OPCAO" == "1" ]; then
     "joaquim@noharm.ai"
     "marcelo@noharm.ai"
     "nifi@noharm.ai"
+    "CN=localhost"
   )
   
   # Mapeia índice do usuário para UUID (mantém consistência)
@@ -127,6 +128,7 @@ if [ "$OPCAO" == "1" ]; then
     "b17cb115-fa4e-3aa8-815b-7298647b7639"  # joaquim@noharm.ai
     "c17cb115-fa4e-3aa8-815b-7298647b763a"  # marcelo@noharm.ai
     "e17cb115-fa4e-3aa8-815b-7298647b763c"  # nifi@noharm.ai
+    "c7db2353-019a-1000-29b4-2c6ca9877f13"  # CN=localhost
   )
   
   echo "📋 Usuários disponíveis:"
@@ -282,6 +284,7 @@ if [ "$OPCAO" == "1" ]; then
           cut -d"\"" -f4
         '
       )
+      IP_ID="????"
   fi
 
   # Se ainda não encontrou, usar fallback
@@ -303,11 +306,15 @@ if [ "$OPCAO" == "1" ]; then
   generate_pg_policies() {
     local PG_UUID="$1"
     local GROUP_ID="$2"
+    local IP_ID="$3"
 
     local P1=$(generate_uuid)
     local P2=$(generate_uuid)
     local P3=$(generate_uuid)
     local P4=$(generate_uuid)
+    local IP1=$(generate_uuid)
+    local IP2=$(generate_uuid)
+    local IP3=$(generate_uuid)
 
     cat <<EOF
         <policy identifier="$P1" resource="/process-groups/$PG_UUID" action="R">
@@ -322,6 +329,16 @@ if [ "$OPCAO" == "1" ]; then
         <policy identifier="$P4" resource="/data/process-groups/$PG_UUID" action="R">
             <group identifier="$GROUP_ID"/>
         </policy>
+        <policy identifier="$IP1" resource="/policies/input-ports/$IP_ID" action="R">
+            <group identifier="noharm-admins-group"/>
+        </policy>
+        <policy identifier="$IP2" resource="/policies/input-ports/$IP_ID" action="W">
+            <group identifier="noharm-admins-group"/>
+        </policy>
+        <policy identifier="$IP3" resource="/data-transfer/input-ports/$IP_ID" action="W">
+            <group identifier="noharm-admins-group"/>
+        </policy>
+        
 EOF
 }
 
@@ -377,7 +394,7 @@ EOF
 
   # Adiciona políticas específicas do process group
   AUTHORIZATIONS_XML="${AUTHORIZATIONS_XML}
-  $(generate_pg_policies "$ROOT_PG_ID" "noharm-admins-group")"
+  $(generate_pg_policies "$ROOT_PG_ID" "noharm-admins-group" "$IP_ID")"
 
   AUTHORIZATIONS_XML="${AUTHORIZATIONS_XML}
       </policies>
