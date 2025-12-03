@@ -13,7 +13,7 @@ sleep 2 && \
 for file in /tmp/nifi-upload/*; do
     if [ -f "$file" ]; then
         filename=$(basename "$file")
-        aws s3 cp "$file" "s3://noharm-nifi/#{schema.name}/backup/conf/$filename"
+        aws s3 cp "$file" "s3://noharm-nifi/$schema_name/backup/conf/$filename"
     fi
 done && \
 rm -rf /tmp/nifi-upload
