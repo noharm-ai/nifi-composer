@@ -1,11 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-CONTAINER_NAME="noharm-nifi"
 NIFI_CONF_DIR="/opt/nifi/nifi-current/conf"
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 BACKUP_ROOT="/opt/nifi/nifi-current/conf"
 BACKUP_DIR="$BACKUP_ROOT/backup_$TIMESTAMP"
+DEFAULT_CONTAINER="noharm-nifi"
+CONTAINER_NAME=""
 
 # Funções auxiliares
 log()  { echo -e "\n==== $* ====\n" >&2; }
@@ -85,6 +86,20 @@ echo "==========================================="
 echo "-------------------------------------------"
 read -rp "Escolha uma opção (1, 2, 3, 4 ou 5): " OPCAO
 echo "-------------------------------------------"
+
+echo "📦 Detectando containers Docker em execução..."
+CONTAINERS_RUNNING=$(docker ps --format '{{.Names}}' | grep 'nifi' || true)
+if [ -z "$CONTAINERS_RUNNING" ]; then
+  erro "Nenhum container Docker do NiFi em execução foi encontrado."
+fi
+echo "Containers NiFi em execução:"
+echo "$CONTAINERS_RUNNING"
+
+echo "-------------------------------------------"
+read -rp "Informe o nome do container NiFi [${DEFAULT_CONTAINER}]: " INPUT_CONTAINER
+CONTAINER_NAME="${INPUT_CONTAINER:-$DEFAULT_CONTAINER}"
+
+echo "➡️ Usando container: $CONTAINER_NAME"
 
 if [ "$OPCAO" == "1" ]; then
   echo "🔐 Ativar login com o Google (OIDC)"
@@ -290,11 +305,12 @@ if [ "$OPCAO" == "1" ]; then
         docker exec "$CONTAINER_NAME" bash -c '
           zcat /opt/nifi/nifi-current/conf/flow.json.gz |
           jq -r "
-            .rootGroup.processGroups[]
+            .rootGroup
+            | recurse(.processGroups[]?)
             | .inputPorts[]?
             | select(.name == \"BulletinMonitor\")
             | .instanceIdentifier
-          " 2>/dev/null
+          " 2>/dev/null | head -n 1
         '
       )
   fi
@@ -561,11 +577,12 @@ elif [ "$OPCAO" == "4" ]; then
         docker exec "$CONTAINER_NAME" bash -c '
           zcat /opt/nifi/nifi-current/conf/flow.json.gz |
           jq -r "
-            .rootGroup.processGroups[]
+            .rootGroup
+            | recurse(.processGroups[]?)
             | .inputPorts[]?
             | select(.name == \"BulletinMonitor\")
             | .instanceIdentifier
-          " 2>/dev/null
+          " 2>/dev/null | head -n 1
         '
       )
       echo "✅ UUID do root process group encontrado: $ROOT_PG_ID"
@@ -606,11 +623,12 @@ elif [ "$OPCAO" == "5" ]; then
         docker exec "$CONTAINER_NAME" bash -c '
           zcat /opt/nifi/nifi-current/conf/flow.json.gz |
           jq -r "
-            .rootGroup.processGroups[]
+            .rootGroup
+            | recurse(.processGroups[]?)
             | .inputPorts[]?
             | select(.name == \"BulletinMonitor\")
             | .instanceIdentifier
-          " 2>/dev/null
+          " 2>/dev/null | head -n 1
         '
       )
   fi
