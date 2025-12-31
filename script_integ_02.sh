@@ -276,4 +276,52 @@ main() {
     check_status "Falha ao reiniciar o container noharm-nifi"
 }
 
-main "$@"
+run_with_env_file() {
+    local env_file="$1"
+
+    if [ ! -f "$env_file" ]; then
+        echo "### Erro: arquivo env não encontrado: $env_file"
+        exit 1
+    fi
+
+    # Carrega variáveis do arquivo (formato KEY=VALUE)
+    set -a
+    # shellcheck disable=SC1090
+    source "$env_file"
+    set +a
+
+    # Defaults
+    REINSTALL_MODE="${REINSTALL_MODE:-false}"
+    DB_QUERY="${DB_QUERY:-}"
+    DB_MULTI_QUERY="${DB_MULTI_QUERY:-}"
+
+    # Valida obrigatórios mínimos (ajuste se quiser ser mais rígido)
+    if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ] || [ -z "${CLIENT_NAME:-}" ]; then
+        echo "### Erro: faltam variáveis obrigatórias no env (ex.: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, CLIENT_NAME)."
+        exit 1
+    fi
+
+    # Chama o main na ordem esperada (15 args)
+    main \
+      "$REINSTALL_MODE" \
+      "$AWS_ACCESS_KEY_ID" \
+      "$AWS_SECRET_ACCESS_KEY" \
+      "$GETNAME_SSL_URL" \
+      "$DB_TYPE" \
+      "$DB_HOST" \
+      "$DB_DATABASE" \
+      "$DB_PORT" \
+      "$DB_USER" \
+      "$DB_PASS" \
+      "$DB_QUERY" \
+      "$PATIENT_ID" \
+      "$DB_MULTI_QUERY" \
+      "$IDS_PATIENT" \
+      "$CLIENT_NAME"
+}
+
+if [ "$#" -eq 1 ] && [ -f "$1" ]; then
+    run_with_env_file "$1"
+else
+    main "$@"
+fi
