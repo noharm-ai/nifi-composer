@@ -27,6 +27,35 @@ if [[ $? -ne 0 ]]; then
   echo "AWS CLI instalado com sucesso."
 fi
 
+check_required_flow_or_exit() {
+  # AWS_S3_BUCKET pode ser "meu-bucket" ou "s3://meu-bucket"
+  local bucket="${AWS_S3_BUCKET#s3://}"
+  bucket="${bucket%/}"
+
+  # key esperado: <cliente>/backup/conf/flow.json.gz
+  local key="${NOME_CLIENTE%/}/backup/conf/flow.json.gz"
+
+  echo "### Validando acesso e existência do flow: s3://${bucket}/${key}"
+
+  local out rc
+  out="$(docker exec --user="root" "$DOCKER_CONTAINER" bash -lc \
+    "aws s3api head-object --bucket '$bucket' --key '$key' >/dev/null" 2>&1)"
+  rc=$?
+
+  if [ $rc -ne 0 ]; then
+    echo "### Erro: não foi possível acessar ou não existe o arquivo obrigatório:"
+    echo "###   s3://${bucket}/${key}"
+    echo "### Detalhe (aws):"
+    echo "$out"
+    echo "### Abortando para não continuar com restore incompleto."
+    exit 1
+  fi
+
+  echo "### OK: flow.json.gz existe e está acessível no S3."
+}
+
+check_required_flow_or_exit
+
 # Copiar arquivos do S3 para o NiFi
 echo "Copiando arquivos do S3..."
 docker exec --user="root" -it "$DOCKER_CONTAINER" bash -c "
